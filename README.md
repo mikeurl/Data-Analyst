@@ -1,468 +1,167 @@
 # IPEDS Data Analysis Toolkit
 
-A comprehensive Python toolkit for generating, validating, anonymizing, and analyzing IPEDS (Integrated Postsecondary Education Data System) student completion data with AI-powered natural language query capabilities.
+An AI-powered tool for analyzing student enrollment and completion data. Ask questions in plain English and get instant answers with charts and insights.
 
-## Overview
+---
 
-This toolkit provides a complete workflow for working with IPEDS-like student data:
+## What Does This Do?
 
-1. **Database Schema Creation** - SQLite database with proper relational structure
-2. **Synthetic Data Generation** - Realistic student enrollment and completion data
-3. **Data Validation** - Comprehensive checks for data quality
-4. **Data Anonymization** - Privacy-preserving student ID randomization
-5. **AI-Powered Analysis** - Natural language queries using OpenAI GPT models
+This toolkit lets you:
+- ✅ Analyze student retention rates
+- ✅ Track GPA trends by demographics
+- ✅ Explore graduation patterns
+- ✅ Ask questions in plain English (powered by AI)
+- ✅ Generate reports automatically
+
+All with synthetic IPEDS-style data included.
+
+---
+
+## Installation
+
+Choose your operating system:
+
+### 🪟 Windows
+**[Follow the Windows Setup Guide →](docs/SETUP_WINDOWS.md)**
+
+### 🍎 Mac
+**[Follow the Mac Setup Guide →](docs/SETUP_MAC.md)**
+
+Each guide is written for complete beginners. No command line experience needed!
+
+**Time to install:** 10 minutes
+**Time to get first result:** 2 minutes after installation
+
+---
+
+## Quick Summary
+
+Once installed, you'll be able to:
+
+1. **Start the tool** - Double-click `start.bat` (Windows) or run `./start.sh` (Mac)
+2. **Ask questions** - Type questions like "What's the retention rate for freshmen?"
+3. **Get instant answers** - See SQL code, results, and explanations
+
+---
+
+## Example Questions You Can Ask
+
+- "How many students are in each program?"
+- "What are the retention rates by race and ethnicity?"
+- "Show me average GPA by class year"
+- "Which programs have the highest graduation rates?"
+- "How many students dropped out vs graduated?"
+
+---
+
+## What's Included
+
+### Core Analysis Scripts
+- `create_ipeds_db_schema.py` - Creates the database structure
+- `SyntheticDataforSchema2.py` - Generates realistic student data
+- `ai_sql_python_assistant.py` - AI-powered query interface
+- `validate_data.py` - Data quality checks
+- `anonymize_data.py` - Privacy tools
+
+### Easy Installation
+- `setup.bat` / `setup.sh` - One-click installers
+- `start.bat` / `start.sh` - One-click launchers
+- Automatic database creation
+- Sample data generation
+
+### Documentation
+- **[Windows Setup](docs/SETUP_WINDOWS.md)** - Step-by-step for Windows
+- **[Mac Setup](docs/SETUP_MAC.md)** - Step-by-step for Mac
+
+---
+
+## Requirements
+
+- **Python 3.8+** (installation guide included in setup docs)
+- **10 minutes** for installation
+- **Internet connection** to download packages
+- **OpenAI API key** (optional, for AI features - can be added later)
+
+---
 
 ## Features
 
-- **Realistic Data Modeling**: Multi-year student populations with GPA-based retention, class progression, and graduations
-- **Two Data Formats**: SQLite database (relational) and CSV (flat files)
-- **AI Assistant**: Ask questions in plain English and get SQL + Python analysis automatically
-- **Data Privacy Tools**: Built-in anonymization with translation tables
-- **Validation Suite**: Automated checks for IPEDS compliance and data quality
+### 🤖 AI-Powered Analysis
+Ask questions in plain English. The AI generates SQL queries, runs them, and explains the results.
 
-## Quick Start
+### 📊 Realistic Data
+Pre-loaded with 2,000+ synthetic students across 8 years, including:
+- Enrollment records
+- Course grades
+- Retention tracking
+- Graduation data
+- Demographics
 
-> **🚀 NEW: Automated Installer!** Get up and running in under 5 minutes with one command:
-> - **Windows**: Run `setup.bat`
-> - **Mac/Linux**: Run `./setup.sh`
->
-> See [QUICKSTART.md](docs/QUICKSTART.md) for instant setup instructions!
+### 🔒 Privacy Built-In
+- All data is synthetic (no real students)
+- Anonymization tools included
+- Works completely offline (except for AI features)
 
-### Prerequisites
-
-- Python 3.8 or higher
-- OpenAI API key (for AI assistant features - optional, can add later)
-
-### Automated Installation (Recommended)
-
-**Windows:**
-```cmd
-setup.bat
-```
-
-**Mac/Linux:**
-```bash
-chmod +x setup.sh
-./setup.sh
-```
-
-The installer will:
-- ✓ Check Python version
-- ✓ Create virtual environment
-- ✓ Install dependencies
-- ✓ Configure API key
-- ✓ Create database
-- ✓ Generate sample data
-
-Then launch with `start.bat` (Windows) or `./start.sh` (Mac/Linux)!
-
-### Manual Installation
-
-If you prefer manual setup or the automated installer fails:
-- **Windows**: See [SETUP_WINDOWS.md](docs/SETUP_WINDOWS.md)
-- **Mac/Linux**: See [SETUP_MAC.md](docs/SETUP_MAC.md)
-
-### Basic Usage (Manual)
-
-1. **Create the database schema:**
-   ```bash
-   python create_ipeds_db_schema.py
-   ```
-
-2. **Generate synthetic data:**
-   ```bash
-   python SyntheticDataforSchema2.py
-   ```
-
-3. **Launch the AI assistant (optional):**
-   ```bash
-   python ai_sql_python_assistant.py
-   ```
-   Then open your browser to http://localhost:7860
-
-## Project Structure
-
-```
-Data-Analyst/
-│
-├── install.py                     # 🆕 Automated installer (cross-platform)
-├── setup.bat                      # 🆕 Windows quick installer
-├── setup.sh                       # 🆕 Mac/Linux quick installer
-├── start.bat                      # 🆕 Windows quick launcher
-├── start.sh                       # 🆕 Mac/Linux quick launcher
-│
-├── create_ipeds_db_schema.py      # Creates SQLite database schema
-├── SyntheticDataforSchema2.py     # Generates synthetic student data (DB)
-├── generate_synthetic_data.py     # Generates synthetic student data (CSV)
-├── validate_data.py               # Validates CSV data files
-├── anonymize_data.py              # Anonymizes student IDs in CSV files
-├── ai_sql_python_assistant.py     # AI-powered query interface
-│
-├── requirements.txt               # Python dependencies
-├── .env.example                   # Example environment variables
-├── .gitignore                     # Git ignore rules
-│
-├── docs/                          # 📁 Documentation
-│   ├── QUICKSTART.md             # Quick installation guide
-│   ├── START_HERE.md             # Troubleshooting guide
-│   ├── INSTALL_HELP.md           # Installation help
-│   ├── WHAT_GETS_CREATED.md      # File creation guide
-│   ├── HOW_TO_MERGE.md           # Merging guide
-│   ├── SETUP_WINDOWS.md          # Windows setup instructions
-│   └── SETUP_MAC.md              # Mac/Linux setup instructions
-│
-└── README.md                      # This file
-```
-
-## Core Scripts
-
-### 1. create_ipeds_db_schema.py
-
-Creates a SQLite database with five related tables:
-- `students` - Demographics (race/ethnicity, gender, DOB)
-- `enrollments` - Term enrollments with retention tracking
-- `courses` - Course catalog
-- `course_enrollments` - Individual grades
-- `completions` - Degrees/certificates awarded
-
-**Usage:**
-```bash
-python create_ipeds_db_schema.py
-```
-
-**Output:** Creates `ipeds_data.db`
+### 📈 Ready for Analysis
+- SQLite database format
+- CSV export options
+- Compatible with Excel, R, Python, Tableau
 
 ---
 
-### 2. SyntheticDataforSchema2.py
+## Getting Help
 
-Generates realistic multi-year student population data with:
-- ~250 new freshmen per Fall term (with variation)
-- GPA-based retention modeling
-- Class progression (Freshman → Senior)
-- Graduations and dropouts
-- Course enrollments with letter grades
+### Installation Issues
+Check the setup guides:
+- [Windows troubleshooting](docs/SETUP_WINDOWS.md#troubleshooting)
+- [Mac troubleshooting](docs/SETUP_MAC.md#troubleshooting)
 
-**Usage:**
-```bash
-python SyntheticDataforSchema2.py
-```
+### Common Problems
 
-**Configuration:** Edit parameters in the script:
-- `total_years`: Number of Fall terms (default: 8)
-- `new_freshmen_each_fall`: Base cohort size (default: 250)
-- `senior_grad_prob`: Graduation probability (default: 0.70)
-- `race_penalty_for_retention`: Disparity modeling (default: 0.05)
+**"Python not found"**
+- Follow Step 1 in the setup guide for your OS
 
-**Output:** Populates `ipeds_data.db` with thousands of student records
+**"Web page won't open"**
+- Make sure you see "Running on local URL: http://127.0.0.1:7860"
+- Open your browser and go to http://localhost:7860
 
-**Note on Retention Modeling:** The script includes a `race_penalty_for_retention` parameter that simulates observed disparities in retention rates. This is for research/analysis purposes to model real-world patterns. Set to `0` if you want equal retention rates across all demographics.
+**"AI queries don't work"**
+- You need an OpenAI API key (get one at https://platform.openai.com)
+- Add it to the `.env` file (instructions in setup guides)
 
 ---
 
-### 3. generate_synthetic_data.py
-
-Generates CSV-format completion data (alternative to database approach).
-
-**Usage:**
-```bash
-python generate_synthetic_data.py
-```
-
-**Output:** Creates `synthetic_student_level_data.csv`
-
-**Use Cases:**
-- Testing validation scripts
-- Creating sample datasets for reporting
-- Demonstrating anonymization workflows
-
----
-
-### 4. validate_data.py
-
-Validates CSV data files for IPEDS compliance.
-
-**Checks performed:**
-- Required columns present
-- CIP code format (XX.XXXX)
-- Award category/subtype consistency
-- Age ranges (0-100)
-- Gender values
-- Data distribution analysis
-
-**Usage:**
-```bash
-python validate_data.py
-```
-
-**To use with custom files:**
-```python
-from validate_data import validate_student_data
-
-issues = validate_student_data("your_file.csv")
-for issue in issues:
-    print(issue)
-```
-
----
-
-### 5. anonymize_data.py
-
-Anonymizes student IDs in CSV files for privacy protection.
-
-**Usage:**
-```bash
-python anonymize_data.py input.csv output_anonymized.csv translation_table.csv
-```
-
-**Outputs:**
-1. `output_anonymized.csv` - Data with randomized student IDs
-2. `translation_table.csv` - Mapping for re-identification (keep secure!)
-
-**Example:**
-```bash
-python anonymize_data.py synthetic_student_level_data.csv \
-    anonymized_data.csv \
-    translation_table.csv
-```
-
-**Security Note:** The translation table allows re-identification. Store it securely and separately from anonymized data.
-
----
-
-### 6. ai_sql_python_assistant.py
-
-AI-powered interface for querying IPEDS data using natural language.
-
-**Features:**
-- Ask questions in plain English
-- Automatic SQL query generation
-- Python-based data analysis
-- Natural language explanations
-- Web-based Gradio interface
-
-**Requirements:**
-- OpenAI API key (GPT-4 access recommended)
-- Generated database (`ipeds_data.db`)
-
-**Usage:**
-```bash
-python ai_sql_python_assistant.py
-```
-
-Then open http://localhost:7860 in your browser.
-
-**Example queries:**
-- "What are the retention rates by race and ethnicity?"
-- "Show me the average GPA by class year"
-- "How many students graduated in each program?"
-- "What's the distribution of students across different terms?"
-
-**Security Warning:** This script uses `exec()` for code execution. Use only in trusted environments with controlled inputs. Not recommended for production without additional security measures.
-
----
-
-## Data Model
+## Technical Details
 
 ### Database Schema
+- **students** - Demographics and IDs
+- **enrollments** - Term-by-term enrollment with retention flags
+- **courses** - Course catalog
+- **course_enrollments** - Individual course grades
+- **completions** - Degrees and certificates awarded
 
-The SQLite database follows an IPEDS-like relational structure:
-
-```
-students (student_id, first_name, last_name, dob, gender, race_ethnicity)
-    │
-    ├─→ enrollments (enrollment_id, student_id, term, program, status,
-    │                 retained_next_term, class_year, avg_gpa)
-    │       │
-    │       └─→ course_enrollments (course_enrollment_id, enrollment_id,
-    │                                course_id, grade, grade_points)
-    │               │
-    │               └─→ courses (course_id, course_code, course_name, credit_hours)
-    │
-    └─→ completions (completion_id, student_id, award_type, cip_code, completion_date)
-```
-
-### Key Fields
-
-- **CIP Codes**: Classification of Instructional Programs (e.g., "11.0101" = Computer Science)
-- **Class Year**: 1=Freshman, 2=Sophomore, 3=Junior, 4=Senior
-- **Retained Next Term**: 0=Did not return, 1=Returned
-- **Grade Points**: 4.0=A, 3.0=B, 2.0=C, 1.0=D, 0.0=F
-
----
-
-## Common Workflows
-
-### Workflow 1: Database Analysis
-
-1. Create schema: `python create_ipeds_db_schema.py`
-2. Generate data: `python SyntheticDataforSchema2.py`
-3. Analyze with AI: `python ai_sql_python_assistant.py`
-
-### Workflow 2: CSV Analysis
-
-1. Generate CSV: `python generate_synthetic_data.py`
-2. Validate: `python validate_data.py`
-3. Anonymize: `python anonymize_data.py input.csv output.csv translation.csv`
-
-### Workflow 3: Custom Analysis
-
-```python
-import sqlite3
-import pandas as pd
-
-# Connect to database
-conn = sqlite3.connect("ipeds_data.db")
-
-# Run custom queries
-query = """
-SELECT
-    race_ethnicity,
-    AVG(avg_gpa) as average_gpa,
-    AVG(retained_next_term) as retention_rate
-FROM enrollments e
-JOIN students s ON e.student_id = s.student_id
-GROUP BY race_ethnicity
-"""
-
-df = pd.read_sql_query(query, conn)
-print(df)
-```
-
----
-
-## Configuration
-
-### Environment Variables
-
-The AI assistant requires an OpenAI API key:
-
-1. Copy `.env.example` to `.env`
-2. Edit `.env` and add your key:
-   ```
-   OPENAI_API_KEY=sk-your-actual-key-here
-   ```
-
-**Or** set it in your shell:
-- **Windows**: `set OPENAI_API_KEY=sk-your-key`
-- **Mac/Linux**: `export OPENAI_API_KEY=sk-your-key`
-
-### Script Parameters
-
-Most scripts have configurable parameters at the top of the file. Common ones:
-
-**SyntheticDataforSchema2.py:**
-```python
-total_years=8                    # Number of Fall terms
-new_freshmen_each_fall=250       # Base cohort size
-senior_grad_prob=0.70           # Graduation probability
-race_penalty_for_retention=0.05  # Disparity modeling (0 = no disparity)
-```
-
-**generate_synthetic_data.py:**
-```python
-num_students=200  # Number of completion records
-seed=42          # Random seed for reproducibility
-```
-
----
-
-## Troubleshooting
-
-### "Database file not found"
-Run `python create_ipeds_db_schema.py` first.
-
-### "OpenAI API key not set"
-Set the `OPENAI_API_KEY` environment variable or create a `.env` file.
-
-### "No module named 'openai'" (or other packages)
-Install dependencies: `pip install -r requirements.txt`
-
-### "Port 7860 already in use"
-Edit `ai_sql_python_assistant.py` and change `server_port=7860` to another port.
-
-### Validation fails with CIP code errors
-Ensure CIP codes follow the format "XX.XXXX" (e.g., "11.0101").
-
----
-
-## Important Notes
-
-### Security Considerations
-
-1. **API Keys**: Never commit your `.env` file to git. Use `.env.example` as a template.
-2. **exec() Usage**: The AI assistant uses `exec()` for code execution. Only use in trusted environments.
-3. **Translation Tables**: Store anonymization translation tables securely and separately from anonymized data.
-
-### Data Privacy
-
-- All generated data is **synthetic** - no real student information is used
-- The anonymization tool helps protect privacy in real data scenarios
-- Follow your institution's data governance policies
-
-### Research Ethics
-
-The retention modeling includes parameters that can simulate demographic disparities. This is intended for:
-- Understanding existing equity gaps
-- Testing intervention strategies
-- Research and educational purposes
-
-**It is not intended to perpetuate bias.** Consider carefully whether including disparities serves your analysis goals. Set `race_penalty_for_retention=0` for equal retention rates.
-
----
-
-## Dependencies
-
-See [requirements.txt](requirements.txt) for full list:
-
-- `pandas` - Data manipulation
-- `numpy` - Numerical computing
-- `openai` - OpenAI API client
-- `gradio` - Web interface
-- `python-dotenv` - Environment variable management (optional)
-- `sqlite3` - Database (included in Python standard library)
-
----
-
-## Contributing
-
-This is a toolkit for educational and research purposes. To improve it:
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+### Data Model
+Follows IPEDS (Integrated Postsecondary Education Data System) standards for higher education reporting.
 
 ---
 
 ## License
 
-This project is provided as-is for educational and research purposes.
+This is an educational and research tool. All generated data is synthetic and does not represent real individuals.
 
 ---
 
-## Support
+## Quick Start (Summary)
 
-For issues, questions, or suggestions:
-1. Check the troubleshooting section above
-2. Review the setup guides (docs/SETUP_WINDOWS.md, docs/SETUP_MAC.md)
-3. Open an issue on the repository
-
----
-
-## Acknowledgments
-
-- IPEDS data standards from the National Center for Education Statistics (NCES)
-- OpenAI GPT models for natural language processing
-- Gradio framework for web interfaces
+1. **Install Python** (see setup guide for your OS)
+2. **Download this repository** (green "Code" button → "Download ZIP")
+3. **Run the installer** (`setup.bat` on Windows, `./setup.sh` on Mac)
+4. **Start the tool** (`start.bat` on Windows, `./start.sh` on Mac)
+5. **Open your browser** to http://localhost:7860
+6. **Start analyzing!** 🎉
 
 ---
 
-## Version History
-
-- **v1.0** - Initial release with core functionality
-  - Database schema creation
-  - Synthetic data generation
-  - AI-powered query interface
-  - Validation and anonymization tools
+**Ready to get started?**
+- **[Windows Users: Start Here →](docs/SETUP_WINDOWS.md)**
+- **[Mac Users: Start Here →](docs/SETUP_MAC.md)**
