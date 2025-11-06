@@ -35,12 +35,16 @@ DB_PATH = "ipeds_data.db"  # Path to your SQLite DB file.
 # Get OpenAI API key from environment variable
 openai.api_key = os.getenv("OPENAI_API_KEY")
 if not openai.api_key:
-    print("ERROR: OPENAI_API_KEY environment variable not set.")
-    print("Please set it using:")
+    print("\n" + "="*70)
+    print("WARNING: OPENAI_API_KEY environment variable not set.")
+    print("="*70)
+    print("The web interface will start, but you won't be able to ask questions")
+    print("until you set your API key.")
+    print("\nTo set your API key:")
     print("  Windows: set OPENAI_API_KEY=your_key_here")
     print("  Mac/Linux: export OPENAI_API_KEY=your_key_here")
     print("\nOr add it to a .env file and load it with python-dotenv")
-    sys.exit(1)
+    print("="*70 + "\n")
 
 ###############################################################################
 # 2. DYNAMIC SCHEMA FETCHING
@@ -238,6 +242,23 @@ def ai_assistant(user_input):
     3) GPT -> Python code, remove fences, run the code.
     4) GPT -> final explanation.
     """
+    # Check if API key is set
+    if not openai.api_key:
+        return """
+❌ OpenAI API Key Not Set
+
+To use this AI assistant, you need to set your OpenAI API key.
+
+Steps to get started:
+1. Get an API key from: https://platform.openai.com/api-keys
+2. Set the environment variable:
+   • Windows: set OPENAI_API_KEY=your_key_here
+   • Mac/Linux: export OPENAI_API_KEY=your_key_here
+3. Restart this application
+
+For more information, see the README.md file.
+"""
+
     # Step A: GPT for SQL
     raw_sql_code = ask_gpt_for_sql(user_input)
     # Clean out triple backticks or ```sql
