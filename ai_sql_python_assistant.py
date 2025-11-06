@@ -235,15 +235,18 @@ Provide a concise, friendly explanation of these results for the user.
 # 5. GRADIO INTERFACE
 ###############################################################################
 
-def ai_assistant(user_input):
+def ai_assistant(user_input, api_key_input):
     """
     1) GPT -> SQL code (fenced or unfenced).
     2) Remove fences, run the query.
     3) GPT -> Python code, remove fences, run the code.
     4) GPT -> final explanation.
     """
+    # Use the API key from input if provided, otherwise use the global one
+    active_api_key = api_key_input.strip() if api_key_input and api_key_input.strip() else openai.api_key
+
     # Check if API key is set
-    if not openai.api_key:
+    if not active_api_key:
         return """
 ❌ OpenAI API Key Not Set
 
@@ -251,55 +254,63 @@ To use this AI assistant, you need to set your OpenAI API key.
 
 Steps to get started:
 1. Get an API key from: https://platform.openai.com/api-keys
-2. Set the environment variable:
+2. Enter it in the "OpenAI API Key" field above, OR
+3. Set the environment variable:
    • Windows: set OPENAI_API_KEY=your_key_here
    • Mac/Linux: export OPENAI_API_KEY=your_key_here
-3. Restart this application
 
 For more information, see the README.md file.
 """
 
-    # Step A: GPT for SQL
-    raw_sql_code = ask_gpt_for_sql(user_input)
-    # Clean out triple backticks or ```sql
-    sql_code_clean = remove_sql_fences(raw_sql_code)
+    # Temporarily set the API key for this request
+    original_key = openai.api_key
+    openai.api_key = active_api_key
 
-    # Execute
-    df_or_error = run_sql(sql_code_clean)
-    if isinstance(df_or_error, str) and df_or_error.startswith("SQL Error:"):
-        # The SQL failed
-        explanation = f"SQL query failed:\n{df_or_error}\n\nSQL was:\n{sql_code_clean}"
-        return explanation
+    try:
+        # Step A: GPT for SQL
+        raw_sql_code = ask_gpt_for_sql(user_input)
+        # Clean out triple backticks or ```sql
+        sql_code_clean = remove_sql_fences(raw_sql_code)
 
-    # Build a short preview of the DataFrame
-    if isinstance(df_or_error, pd.DataFrame):
-        preview = df_or_error.head().to_string(index=False)
-        cols_list = df_or_error.columns.tolist()
-        df_preview_str = f"Columns: {cols_list}\nFirst 5 rows:\n{preview}"
-    else:
-        df_preview_str = str(df_or_error)
+        # Execute
+        df_or_error = run_sql(sql_code_clean)
+        if isinstance(df_or_error, str) and df_or_error.startswith("SQL Error:"):
+            # The SQL failed
+            explanation = f"SQL query failed:\n{df_or_error}\n\nSQL was:\n{sql_code_clean}"
+            return explanation
 
-    # Step B: GPT for Python
-    raw_py_code = ask_gpt_for_python(user_input, df_preview_str)
-    py_code_clean = remove_python_fences(raw_py_code)
+        # Build a short preview of the DataFrame
+        if isinstance(df_or_error, pd.DataFrame):
+            preview = df_or_error.head().to_string(index=False)
+            cols_list = df_or_error.columns.tolist()
+            df_preview_str = f"Columns: {cols_list}\nFirst 5 rows:\n{preview}"
+        else:
+            df_preview_str = str(df_or_error)
 
-    py_result = run_python_code(py_code_clean, df_or_error)
+        # Step B: GPT for Python
+        raw_py_code = ask_gpt_for_python(user_input, df_preview_str)
+        py_code_clean = remove_python_fences(raw_py_code)
 
-    # Step C: GPT final explanation
-    final_explanation = ask_gpt_for_explanation(
-        sql_code_clean,
-        df_preview_str,
-        py_code_clean,
-        py_result
-    )
+        py_result = run_python_code(py_code_clean, df_or_error)
 
-    return (
-        f"[SQL CODE]\n{sql_code_clean}\n\n"
-        f"[SQL RESULT PREVIEW]\n{df_preview_str}\n\n"
-        f"[PYTHON CODE]\n{py_code_clean}\n\n"
-        f"[PYTHON RESULT]\n{py_result}\n\n"
-        f"[GPT EXPLANATION]\n{final_explanation}"
-    )
+        # Step C: GPT final explanation
+        final_explanation = ask_gpt_for_explanation(
+            sql_code_clean,
+            df_preview_str,
+            py_code_clean,
+            py_result
+        )
+
+        return (
+            f"[SQL CODE]\n{sql_code_clean}\n\n"
+            f"[SQL RESULT PREVIEW]\n{df_preview_str}\n\n"
+            f"[PYTHON CODE]\n{py_code_clean}\n\n"
+            f"[PYTHON RESULT]\n{py_result}\n\n"
+            f"[GPT EXPLANATION]\n{final_explanation}"
+        )
+    finally:
+        # Restore original API key
+        openai.api_key = original_key
 
 def main():
     """Launch the Gradio web interface for the AI assistant."""
@@ -312,27 +323,41 @@ def main():
         print("\nThis will create the database and populate it with synthetic data.")
         sys.exit(1)
 
-    print(f"\nStarting IPEDS AI Assistant...")
+    print(f"\nStarting Higher Education AI Analyst...")
     print(f"Using database: {DB_PATH}")
     print(f"OpenAI Model: gpt-4o")
     print("\nLaunching Gradio interface...")
 
     iface = gr.Interface(
         fn=ai_assistant,
-        inputs=gr.Textbox(
-            lines=3,
-            label="Ask your IPEDS DB anything",
-            placeholder="e.g., 'Show me retention rates by race/ethnicity' or 'What's the average GPA by class year?'"
+        inputs=[
+            gr.Textbox(
+                lines=3,
+                label="Ask your question",
+                placeholder="e.g., 'Show me retention rates by race/ethnicity' or 'What's the average GPA by class year?'"
+            ),
+            gr.Textbox(
+                lines=1,
+                label="OpenAI API Key (optional - leave blank if set via environment variable)",
+                placeholder="sk-...",
+                type="password"
+            )
+        ],
+        outputs=gr.Textbox(
+            label="Analysis Results",
+            lines=20,
+            max_lines=50,
+            show_copy_button=True
         ),
-        outputs=gr.Textbox(label="Analysis Results"),
-        title="IPEDS Data AI Assistant",
-        description="Ask questions about IPEDS student data in natural language. The AI will generate SQL queries and Python analysis code to answer your questions.",
+        title="Higher Education AI Analyst",
+        description="Ask questions about higher education data in natural language. The AI will generate SQL queries and Python analysis code to answer your questions. Get your API key from https://platform.openai.com/api-keys",
         examples=[
-            "What are the retention rates by race and ethnicity?",
-            "Show me the average GPA by class year",
-            "How many students graduated in each program?",
-            "What's the distribution of students across different terms?"
-        ]
+            ["What are the retention rates by race and ethnicity?", ""],
+            ["Show me the average GPA by class year", ""],
+            ["How many students graduated in each program?", ""],
+            ["What's the distribution of students across different terms?", ""]
+        ],
+        cache_examples=False
     )
     iface.launch(share=False, server_port=7860)
 
