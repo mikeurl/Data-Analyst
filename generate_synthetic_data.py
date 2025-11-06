@@ -1,3 +1,22 @@
+"""
+Synthetic Student Completions Data Generator (CSV Format)
+
+This module generates synthetic student-level completion data in CSV format,
+separate from the SQLite database approach. This is useful for:
+- Testing data validation scripts
+- Creating sample datasets for reporting
+- Demonstrating data anonymization workflows
+
+The generated data includes:
+- Student demographics (race/ethnicity, gender, age)
+- Program information (CIP codes, award types)
+- Delivery mode (online, hybrid, in-person)
+- Institutional metadata
+
+Note: This generates CSV data, not database records. For database population,
+use SyntheticDataforSchema2.py instead.
+"""
+
 import pandas as pd
 import numpy as np
 import string
@@ -5,8 +24,32 @@ import random
 
 def generate_synthetic_student_data(num_students=100, seed=42):
     """
-    Generates a student-level dataset for one institution's Completions data.
-    Each row represents a single student who has completed a program.
+    Generates a CSV-ready student completion dataset.
+
+    Creates synthetic data for students who have completed programs, including
+    demographic information, program details, and award types following IPEDS
+    reporting standards.
+
+    Args:
+        num_students: Number of student records to generate (default: 100)
+        seed: Random seed for reproducibility (default: 42)
+
+    Returns:
+        pandas.DataFrame: DataFrame with student completion records
+
+    Output columns:
+        - institution_name: Name of the institution
+        - student_id: Unique student identifier (synthetic)
+        - reporting_year: Academic year for reporting
+        - cip_code: CIP (Classification of Instructional Programs) code
+        - cip_program_name: Program name corresponding to CIP code
+        - award_category: Certificate or Degree
+        - award_subtype: Specific award level (Associate, Bachelor's, etc.)
+        - program_delivery_mode: Fully online, Partly online, or Not online
+        - race_ethnicity: Student race/ethnicity category
+        - gender: Student gender
+        - age: Student age at completion
+        - unusual_notes: Any special circumstances or notes
     """
     np.random.seed(seed)
     

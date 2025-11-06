@@ -1,9 +1,49 @@
+"""
+IPEDS Student Data Validation Script
+
+This module validates student completion data CSV files to ensure data quality
+and compliance with IPEDS reporting standards.
+
+Validation checks include:
+- Required column presence
+- CIP code format validation
+- Award category/subtype consistency
+- Age range validation
+- Gender field validation
+- Distribution analysis
+
+Use this script before submitting data or loading into analysis tools.
+"""
+
 import pandas as pd
+import sys
 
 def validate_student_data(data_path):
     """
-    Loads the student-level data from CSV and performs basic validation checks.
-    Returns a list of validation issues (empty if all checks pass).
+    Performs comprehensive validation on student completion CSV data.
+
+    Checks include:
+    1. File not empty
+    2. Required columns present
+    3. CIP codes match expected format (XX.XXXX)
+    4. Award categories and subtypes are valid combinations
+    5. Age values are within reasonable range (0-100)
+    6. Gender values are from expected set
+    7. CIP code distribution summary
+
+    Args:
+        data_path: Path to the CSV file to validate
+
+    Returns:
+        list: List of validation issues/warnings. Empty list if all checks pass.
+              Last item is always an info message with CIP code distribution.
+
+    Example:
+        issues = validate_student_data("synthetic_student_level_data.csv")
+        if any("Error" in issue for issue in issues):
+            print("Validation failed!")
+        else:
+            print("Validation passed!")
     """
     df = pd.read_csv(data_path)
     

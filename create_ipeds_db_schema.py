@@ -1,10 +1,42 @@
+"""
+IPEDS Database Schema Creator
+
+This module creates a SQLite database with an IPEDS-like schema for storing
+student enrollment, course, and completion data.
+
+The database includes the following tables:
+- students: Student demographic information
+- enrollments: Term-level enrollment records with retention tracking
+- courses: Course catalog
+- course_enrollments: Individual course grades and enrollments
+- completions: Degree/certificate completions
+
+This schema is designed to support analysis of:
+- Student retention and progression
+- Academic performance (GPA tracking)
+- Completion rates by program
+- Demographic equity analyses
+"""
+
 import sqlite3
+import sys
 
 def create_ipeds_db_schema(db_path="ipeds_data.db"):
     """
-    Creates (if not exists) the IPEDS-like schema:
-      students, enrollments, courses, course_enrollments, completions
-    with extra columns for class_year and avg_gpa in enrollments.
+    Creates the IPEDS-like database schema with all necessary tables.
+
+    Creates five related tables:
+    1. students: Core student demographics (race/ethnicity, gender, DOB)
+    2. enrollments: Term enrollment records with class_year, GPA, and retention flag
+    3. courses: Course catalog with credit hours
+    4. course_enrollments: Student grades in individual courses
+    5. completions: Degrees/certificates awarded
+
+    Args:
+        db_path: Path to the SQLite database file (default: "ipeds_data.db")
+
+    Returns:
+        None. Creates or updates the database file at db_path.
     """
     conn = sqlite3.connect(db_path)
     c = conn.cursor()

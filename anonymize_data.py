@@ -1,3 +1,23 @@
+"""
+Student Data Anonymization Tool
+
+This module anonymizes student-level data by replacing real student IDs with
+randomized dummy IDs while maintaining a translation table for re-identification
+if needed.
+
+Use cases:
+- Sharing data with external partners while protecting student privacy
+- Creating demo datasets from real data
+- Compliance with data privacy regulations
+
+The tool generates:
+1. Anonymized CSV with dummy student IDs
+2. Translation table mapping dummy IDs to original IDs (keep secure!)
+
+Security Note: The translation table allows re-identification. Store it securely
+and separately from the anonymized data.
+"""
+
 import pandas as pd
 import random
 import argparse
