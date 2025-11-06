@@ -1,646 +1,345 @@
-# IPEDS Data Analysis Toolkit - Mac/Linux Setup Guide
+# Installing the IPEDS Data Analyst - Mac
 
-Complete step-by-step instructions for setting up and running the IPEDS Data Analysis Toolkit on macOS and Linux.
-
----
-
-## Table of Contents
-
-1. [Prerequisites](#prerequisites)
-2. [Installation](#installation)
-3. [Configuration](#configuration)
-4. [Running the Scripts](#running-the-scripts)
-5. [Troubleshooting](#troubleshooting)
-6. [Next Steps](#next-steps)
+A complete, step-by-step guide for beginners. No experience needed!
 
 ---
 
-## Prerequisites
+## What You Need
 
-### 1. Check Python Installation
-
-Open **Terminal** and run:
-
-```bash
-python3 --version
-```
-
-You should see Python 3.8 or higher (e.g., `Python 3.11.5`).
-
-**If Python is not installed:**
-
-**macOS:**
-```bash
-# Install Homebrew first (if not already installed)
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Install Python
-brew install python3
-```
-
-**Linux (Ubuntu/Debian):**
-```bash
-sudo apt update
-sudo apt install python3 python3-pip python3-venv
-```
-
-**Linux (Fedora/RHEL):**
-```bash
-sudo dnf install python3 python3-pip
-```
-
-### 2. Check pip Installation
-
-```bash
-pip3 --version
-```
-
-You should see pip version info.
-
-### 3. Get an OpenAI API Key (for AI features)
-
-1. Go to [platform.openai.com](https://platform.openai.com/api-keys)
-2. Sign up or log in
-3. Click "Create new secret key"
-4. Copy the key (starts with `sk-...`)
-5. **Save it securely** - you'll need it later
-
-**Note:** The AI assistant requires GPT-4 access. Check your OpenAI account tier.
+1. A Mac computer (macOS 10.15 or newer)
+2. About 10 minutes
+3. Internet connection
 
 ---
 
-## Installation
+## Step 1: Install Python
 
-### Step 1: Download the Repository
+Python is the programming language this tool uses.
 
-**Option A: Using Git**
+### Check if Python is Already Installed
 
-```bash
-cd ~/Documents
-git clone https://github.com/yourusername/Data-Analyst.git
-cd Data-Analyst
-```
+1. Click the **magnifying glass** icon in the top-right corner (Spotlight)
+2. Type: `terminal`
+3. Click on **Terminal** (it has a black square icon)
+4. A white or black window will open. Type: `python3 --version` and press **Enter**
 
-**Option B: Download ZIP**
+**If you see something like "Python 3.11.5":**
+- Great! Python is already installed. Skip to Step 2.
 
-1. Download the repository as a ZIP file
-2. Extract to a folder (e.g., `~/Documents/Data-Analyst`)
-3. Open Terminal and navigate:
-   ```bash
-   cd ~/Documents/Data-Analyst
+**If you see an error or "command not found":**
+- Continue below to install Python.
+
+### Install Python Using Homebrew (Recommended)
+
+Homebrew is a tool that makes installing programs easy on Mac.
+
+#### First, Install Homebrew
+
+1. In Terminal, copy and paste this command:
    ```
+   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+   ```
+2. Press **Enter**
+3. It might ask for your Mac password - type it (nothing will show up, this is normal)
+4. Press **Enter**
+5. Wait 5-10 minutes for it to install
+6. You'll see "Installation successful!"
 
-### Step 2: Create a Virtual Environment (Recommended)
+#### Then, Install Python
 
-Creating a virtual environment keeps dependencies isolated:
+1. In Terminal, type:
+   ```
+   brew install python3
+   ```
+2. Press **Enter**
+3. Wait 2-3 minutes for it to install
 
-```bash
-python3 -m venv venv
-```
+### Verify Python Installed
 
-**Activate the virtual environment:**
+1. In Terminal, type: `python3 --version` and press **Enter**
+2. You should see: `Python 3.11.5` (or similar)
 
-```bash
-source venv/bin/activate
-```
-
-You should see `(venv)` at the start of your terminal prompt.
-
-**To deactivate later:**
-```bash
-deactivate
-```
-
-### Step 3: Install Dependencies
-
-With the virtual environment activated:
-
-```bash
-pip install -r requirements.txt
-```
-
-This will install:
-- pandas (data manipulation)
-- numpy (numerical computing)
-- openai (OpenAI API client)
-- gradio (web interface)
-- python-dotenv (environment variables)
-
-**Verify installation:**
-```bash
-pip list
-```
-
-You should see all the packages listed.
+✅ Python is now installed!
 
 ---
 
-## Configuration
+## Step 2: Download the Data Analyst Tool
 
-### Step 1: Set Up OpenAI API Key
+1. Open your web browser (Safari, Chrome, etc.)
+2. Go to: https://github.com/mikeurl/Data-Analyst
+3. Click the green **"Code"** button
+4. Click **"Download ZIP"**
+5. Wait for download to complete
+6. Go to your **Downloads** folder (in Finder)
+7. Double-click on `Data-Analyst-main.zip` to extract it
+8. A new folder will appear called `Data-Analyst-main`
 
-**Option A: Using .env file (Recommended)**
-
-1. Copy the example file:
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Edit `.env` with your preferred editor:
-   ```bash
-   nano .env
-   # or
-   vim .env
-   # or
-   open -e .env  # macOS only - opens in TextEdit
-   ```
-
-3. Replace `your_openai_api_key_here` with your actual API key:
-   ```
-   OPENAI_API_KEY=sk-your-actual-key-here
-   ```
-
-4. Save and close the editor
-   - nano: `Ctrl+X`, then `Y`, then `Enter`
-   - vim: Press `Esc`, type `:wq`, press `Enter`
-
-**Option B: Set as Environment Variable (Temporary)**
-
-```bash
-export OPENAI_API_KEY=sk-your-actual-key-here
-```
-
-**Note:** This only works for the current Terminal session.
-
-**Option C: Set Permanently in Shell Profile**
-
-Add to your shell configuration file:
-
-**For bash (add to `~/.bashrc` or `~/.bash_profile`):**
-```bash
-echo 'export OPENAI_API_KEY=sk-your-actual-key-here' >> ~/.bashrc
-source ~/.bashrc
-```
-
-**For zsh (macOS default, add to `~/.zshrc`):**
-```bash
-echo 'export OPENAI_API_KEY=sk-your-actual-key-here' >> ~/.zshrc
-source ~/.zshrc
-```
+✅ Files are downloaded!
 
 ---
 
-## Running the Scripts
+## Step 3: Run the Installer
 
-### Step 1: Create the Database Schema
+### Open Terminal in the Downloaded Folder
 
-```bash
-python create_ipeds_db_schema.py
+1. Open **Finder**
+2. Go to **Downloads**
+3. Find the `Data-Analyst-main` folder
+4. **Right-click** on the folder
+5. Choose **"New Terminal at Folder"**
+   - If you don't see this option, hold **Option** key, then right-click, and choose **"New Terminal at Folder"**
+
+A Terminal window will open.
+
+### Run the Setup Script
+
+1. In the Terminal window, type:
+   ```
+   chmod +x setup.sh
+   ```
+2. Press **Enter**
+3. Then type:
+   ```
+   ./setup.sh
+   ```
+4. Press **Enter**
+
+### What You'll See
+
+```
+========================================================================
+ IPEDS Data Analysis Toolkit - Mac Quick Installer
+========================================================================
+
+Python found. Starting installation...
 ```
 
-**Expected output:**
+Then you'll see:
 ```
-Database schema created or verified in 'ipeds_data.db'.
+Checking Python Version
+✓ Python 3.11.5 is compatible
+
+Creating Virtual Environment
+ℹ Creating virtual environment (this may take a minute)...
+✓ Virtual environment created successfully
+
+Installing Dependencies
+ℹ Installing packages (this will take 2-3 minutes)...
+[You'll see lots of text scrolling by - this is normal!]
+✓ All dependencies installed successfully
+
+Configuring OpenAI API Key
+Enter your OpenAI API key (or press Enter to skip):
 ```
 
-**What this does:** Creates a new SQLite database file (`ipeds_data.db`) with empty tables.
+### About the API Key
 
----
+The API key lets you ask questions to the AI. You can:
+- **Press Enter to skip** (you can add it later)
+- **Or paste your key** if you have one from https://platform.openai.com/api-keys
 
-### Step 2: Generate Synthetic Data
-
-```bash
-python SyntheticDataforSchema2.py
+After that, it will:
 ```
+Creating Database Schema
+✓ Database schema created successfully
 
-**Expected output:**
-```
+Generating Sample Data
+ℹ Generating data...
 Done! Total unique students: 2000
-Enrollments inserted: 8541
-Course enrollments inserted: 29847
-Completions inserted: 643
+✓ Sample data generated successfully
+
+========================================================================
+ Installation Complete!
+========================================================================
 ```
 
-**What this does:** Populates the database with realistic synthetic student data spanning 8 years.
+✅ Installation is done!
 
-**This will take:** ~10-30 seconds depending on your computer.
+**Keep the Terminal window open** - don't close it yet!
 
 ---
 
-### Step 3: Launch the AI Assistant (Optional)
+## Step 4: Start the Data Analyst
 
-**Make sure your API key is configured first!**
-
-```bash
-python ai_sql_python_assistant.py
+In the same Terminal window, type:
+```
+./start.sh
 ```
 
-**Expected output:**
+Press **Enter**.
+
+You'll see:
 ```
 Starting IPEDS AI Assistant...
-Using database: ipeds_data.db
-OpenAI Model: gpt-4o
-
 Launching Gradio interface...
 Running on local URL:  http://127.0.0.1:7860
 ```
 
-**What this does:**
-- Starts a web server on your computer
-- Opens a web interface for asking questions about your data
+Your web browser should open automatically to the Data Analyst page.
 
-**To use it:**
+If it doesn't open automatically:
 1. Open your web browser
-2. Go to http://localhost:7860
-3. Type questions like:
-   - "What are the retention rates by race and ethnicity?"
-   - "Show me average GPA by class year"
-   - "How many students graduated in each program?"
+2. Go to: `http://localhost:7860`
 
-**To stop the server:**
-- Press `Ctrl+C` in the Terminal window
+✅ The Data Analyst is now running!
 
 ---
 
-### Step 4: Generate CSV Data (Optional Alternative)
+## Step 5: Use the Data Analyst
 
-If you prefer CSV files instead of a database:
+You should see a web page with:
+- A title: "IPEDS Data AI Assistant"
+- A text box where you can type questions
+- Some example questions below
 
-```bash
-python generate_synthetic_data.py
+### Try Asking a Question
+
+In the text box, type:
+```
+How many students are in the database?
 ```
 
-**Expected output:**
-```
-Student-level synthetic data generated in synthetic_student_level_data.csv.
-```
+Click **"Submit"** and wait a few seconds.
 
-**What this does:** Creates a CSV file with 200 student completion records.
+You'll see:
+1. The SQL code it generated
+2. The results
+3. An explanation in plain English
+
+### More Questions to Try
+
+- "What are the retention rates by race and ethnicity?"
+- "Show me average GPA by class year"
+- "How many students graduated?"
 
 ---
 
-### Step 5: Validate CSV Data (Optional)
+## How to Stop the Data Analyst
 
-To check your CSV data quality:
-
-```bash
-python validate_data.py
-```
-
-**Expected output:** List of validation checks and warnings (if any).
+When you're done:
+1. Go to the Terminal window
+2. Press `Control + C` on your keyboard (not Command!)
+3. The Terminal will show a message and return to the prompt
+4. The web page will stop working (this is normal)
 
 ---
 
-### Step 6: Anonymize Data (Optional)
+## How to Start It Again Later
 
-To anonymize student IDs in a CSV file:
-
-```bash
-python anonymize_data.py synthetic_student_level_data.csv anonymized.csv translation.csv
-```
-
-**Expected output:**
-```
-Anonymized data written to: anonymized.csv
-Translation table written to: translation.csv
-```
-
-**What this does:**
-- Creates `anonymized.csv` with randomized student IDs
-- Creates `translation.csv` with the mapping (keep secure!)
+1. Open **Finder**
+2. Go to **Downloads** → **Data-Analyst-main**
+3. **Right-click** on the folder
+4. Choose **"New Terminal at Folder"**
+5. Type: `./start.sh` and press **Enter**
+6. Open your browser to: `http://localhost:7860`
 
 ---
 
 ## Troubleshooting
 
-### "command not found: python"
+### "python3: command not found"
 
-**Solution:** Use `python3` instead of `python`:
+**Problem:** Python isn't installed.
 
-```bash
-python3 create_ipeds_db_schema.py
-```
-
-**Or create an alias:**
-```bash
-alias python=python3
-```
-
-Add to `~/.bashrc` or `~/.zshrc` to make permanent.
+**Solution:**
+1. Install Homebrew (see Step 1)
+2. Run: `brew install python3`
+3. Try the installer again
 
 ---
 
-### "No module named 'pandas'" (or other packages)
+### "Permission denied: ./setup.sh"
 
-**Solution:** Dependencies not installed or virtual environment not activated.
+**Problem:** The script doesn't have permission to run.
 
-1. Make sure virtual environment is activated:
-   ```bash
-   source venv/bin/activate
-   ```
-
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+**Solution:**
+1. Type: `chmod +x setup.sh` and press **Enter**
+2. Then type: `./setup.sh` and press **Enter**
 
 ---
 
-### "OPENAI_API_KEY environment variable not set"
+### "Port already in use"
 
-**Solution:** API key not configured.
+**Problem:** Something else is using port 7860.
 
-**Quick fix (temporary):**
-```bash
-export OPENAI_API_KEY=sk-your-key-here
-python ai_sql_python_assistant.py
-```
-
-**Permanent fix:** Create a `.env` file (see Configuration section above).
+**Solution:**
+1. In Terminal, type: `lsof -i :7860` and press **Enter**
+2. You'll see a number under "PID"
+3. Type: `kill -9 [PID]` (replace [PID] with the actual number)
+4. Try running `./start.sh` again
 
 ---
 
-### "Database file not found"
+### "Can't connect to http://localhost:7860"
 
-**Solution:** Run schema creation first:
+**Problem:** The server didn't start correctly.
 
-```bash
-python create_ipeds_db_schema.py
-python SyntheticDataforSchema2.py
-```
-
----
-
-### "Port 7860 already in use"
-
-**Solution:** Another program is using that port.
-
-**Option 1: Find and kill the process**
-```bash
-# Find what's using the port
-lsof -i :7860
-
-# Kill it (replace PID with actual process ID)
-kill -9 PID
-```
-
-**Option 2: Use a different port**
-
-1. Open `ai_sql_python_assistant.py`:
-   ```bash
-   nano ai_sql_python_assistant.py
-   ```
-
-2. Find the line (near the bottom):
-   ```python
-   iface.launch(share=False, server_port=7860)
-   ```
-
-3. Change `7860` to another number (e.g., `7861`, `8080`)
-
-4. Save and try again
+**Solution:**
+1. Make sure the Terminal window is still open
+2. Look for the line: "Running on local URL: http://127.0.0.1:7860"
+3. If you don't see it, press Control+C and run `./start.sh` again
 
 ---
 
-### Gradio Interface Won't Open Automatically
+### "New Terminal at Folder" option is missing
 
-**Solution:** Manually open in browser.
+**Problem:** Older macOS version.
 
-After running `python ai_sql_python_assistant.py`, look for:
-```
-Running on local URL:  http://127.0.0.1:7860
-```
+**Solution - Method 1:**
+1. Open **Terminal** from Spotlight
+2. Type: `cd ~/Downloads/Data-Analyst-main` and press **Enter**
+3. Continue with the installation
 
-Copy that URL and paste it into your browser.
-
----
-
-### "Permission denied" when creating database
-
-**Solution:** Check file/directory permissions.
-
-```bash
-# Make sure you have write permissions
-ls -la
-
-# If needed, fix permissions
-chmod 755 .
-```
+**Solution - Method 2:**
+1. Open **System Preferences** → **Keyboard** → **Shortcuts**
+2. Click **Services**
+3. Check the box next to "New Terminal at Folder"
 
 ---
 
-### macOS: "Python quit unexpectedly"
+### Still Having Problems?
 
-**Solution:** Install Python properly through Homebrew, not the system Python.
-
-```bash
-brew install python3
-```
-
-Then create a new virtual environment with the Homebrew Python.
+1. Make sure you have Python 3.8 or newer: `python3 --version`
+2. Make sure you're in the right folder (Data-Analyst-main)
+3. Try restarting your Mac and starting from Step 3
 
 ---
 
-### Linux: "Unable to locate package python3-pip"
+## Adding Your OpenAI API Key Later
 
-**Solution:** Update package lists first.
+If you skipped entering the API key during installation:
 
-```bash
-sudo apt update
-sudo apt install python3-pip
-```
-
----
-
-### OpenAI API Errors
-
-**"Authentication error"**
-- Your API key is wrong or expired
-- Get a new key from platform.openai.com
-
-**"Rate limit exceeded"**
-- You've used your API quota
-- Wait or upgrade your OpenAI plan
-
-**"Model not found"**
-- You don't have access to GPT-4
-- Edit `ai_sql_python_assistant.py` and change `model="gpt-4o"` to `model="gpt-3.5-turbo"`
+1. Open **Finder**
+2. Go to **Downloads** → **Data-Analyst-main**
+3. Press **Command + Shift + .** (period) to show hidden files
+4. Find the file named `.env`
+5. Right-click on it and choose **"Open With"** → **"TextEdit"**
+6. Find the line: `OPENAI_API_KEY=...`
+7. Replace everything after the `=` with your actual key
+8. Press **Command + S** to save
+9. Close TextEdit
+10. Run `./start.sh` again
 
 ---
 
-## Next Steps
+## Summary
 
-### Explore the Data
+**To install:**
+1. Install Python via Homebrew
+2. Download and extract the ZIP file
+3. Open Terminal in the folder
+4. Run `chmod +x setup.sh` then `./setup.sh`
+5. Wait 5-10 minutes
 
-**Option 1: Using the AI Assistant**
-- Run `python ai_sql_python_assistant.py`
-- Ask questions in plain English
+**To use:**
+1. Open Terminal in the Data-Analyst-main folder
+2. Run `./start.sh`
+3. Open browser to `http://localhost:7860`
+4. Type questions and get answers!
 
-**Option 2: Using SQL Directly**
-
-**macOS:**
-- Install [DB Browser for SQLite](https://sqlitebrowser.org/dl/)
-- Open `ipeds_data.db`
-
-**Linux:**
-```bash
-sudo apt install sqlitebrowser  # Ubuntu/Debian
-# or
-sudo dnf install sqlitebrowser  # Fedora
-```
-
-**Command-line SQLite:**
-```bash
-sqlite3 ipeds_data.db
-.tables
-SELECT * FROM students LIMIT 5;
-.quit
-```
-
-**Option 3: Using Python**
-
-Create a new file `my_analysis.py`:
-
-```python
-import sqlite3
-import pandas as pd
-
-conn = sqlite3.connect("ipeds_data.db")
-
-query = """
-SELECT
-    race_ethnicity,
-    AVG(avg_gpa) as avg_gpa,
-    AVG(retained_next_term) as retention_rate
-FROM enrollments e
-JOIN students s ON e.student_id = s.student_id
-GROUP BY race_ethnicity
-"""
-
-df = pd.read_sql_query(query, conn)
-print(df)
-conn.close()
-```
-
-Run it:
-```bash
-python my_analysis.py
-```
+**To stop:**
+- Press `Control+C` in the Terminal window
 
 ---
 
-### Modify Data Generation Parameters
-
-Edit `SyntheticDataforSchema2.py` to change:
-
-```python
-total_years=8                      # Number of Fall terms
-new_freshmen_each_fall=250         # Cohort size
-senior_grad_prob=0.70              # Graduation rate
-race_penalty_for_retention=0.05    # Set to 0 for no disparity
-```
-
-Then regenerate data:
-```bash
-python SyntheticDataforSchema2.py
-```
-
----
-
-### Export Data for Excel
-
-```python
-import sqlite3
-import pandas as pd
-
-conn = sqlite3.connect("ipeds_data.db")
-df = pd.read_sql_query("SELECT * FROM students", conn)
-df.to_excel("students.xlsx", index=False)
-conn.close()
-```
-
-Requires: `pip install openpyxl`
-
----
-
-### Create Shell Aliases for Common Tasks
-
-Add to `~/.bashrc` or `~/.zshrc`:
-
-```bash
-# IPEDS shortcuts
-alias ipeds-activate='cd ~/Documents/Data-Analyst && source venv/bin/activate'
-alias ipeds-reset='rm ipeds_data.db && python create_ipeds_db_schema.py && python SyntheticDataforSchema2.py'
-alias ipeds-ai='python ai_sql_python_assistant.py'
-```
-
-Then use:
-```bash
-ipeds-activate  # Navigate to project and activate environment
-ipeds-reset     # Regenerate all data
-ipeds-ai        # Launch AI assistant
-```
-
----
-
-## Quick Reference
-
-### Start a New Analysis Session
-
-```bash
-cd ~/Documents/Data-Analyst
-source venv/bin/activate
-python ai_sql_python_assistant.py
-```
-
-### Regenerate All Data
-
-```bash
-rm ipeds_data.db
-python create_ipeds_db_schema.py
-python SyntheticDataforSchema2.py
-```
-
-### Update Dependencies
-
-```bash
-pip install --upgrade -r requirements.txt
-```
-
-### Check Database Size
-
-```bash
-ls -lh ipeds_data.db
-```
-
-### Quick SQL Query
-
-```bash
-sqlite3 ipeds_data.db "SELECT COUNT(*) FROM students;"
-```
-
----
-
-## Additional Resources
-
-- **Main README**: [README.md](../README.md)
-- **Windows Setup**: [SETUP_WINDOWS.md](SETUP_WINDOWS.md)
-- **OpenAI Docs**: https://platform.openai.com/docs
-- **Pandas Docs**: https://pandas.pydata.org/docs
-- **SQLite Tutorial**: https://www.sqlitetutorial.net
-
----
-
-## Getting Help
-
-If you encounter issues not covered here:
-
-1. Check the main [README.md](../README.md) troubleshooting section
-2. Verify all prerequisites are installed correctly
-3. Make sure virtual environment is activated (`source venv/bin/activate`)
-4. Try running scripts one at a time
-5. Check error messages carefully - they often indicate the problem
-
----
-
-**Happy analyzing!** 🎉
+That's it! You're ready to analyze student data! 🎉
