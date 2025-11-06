@@ -1,3 +1,23 @@
+"""
+Synthetic IPEDS Data Generator with GPA-Based Retention Modeling
+
+This module generates realistic synthetic student data for an IPEDS-like database,
+simulating multi-year student populations with:
+- Realistic class progression (Freshman → Sophomore → Junior → Senior)
+- GPA-based retention modeling
+- Graduations and dropouts
+- Course enrollments with grades
+- Demographic diversity
+
+IMPORTANT NOTE ON RETENTION MODELING:
+The retention model includes a 'race_penalty_for_retention' parameter that can
+simulate observed disparities in retention rates. This is included for research
+and analysis purposes to model real-world patterns, NOT to perpetuate bias.
+Users should understand that this creates synthetic data reflecting systemic
+inequities that exist in higher education. Consider carefully whether including
+this disparity serves your analysis goals.
+"""
+
 import sqlite3
 import random
 import datetime
@@ -7,26 +27,46 @@ DB_PATH = "ipeds_data.db"
 def generate_stable_population_data(
     total_years=8,
     start_fall_year=2019,
-    new_freshmen_each_fall=250,    # base number of new freshmen
-    freshman_to_soph_prob=0.80,
-    soph_to_junior_prob=0.85,
-    junior_to_senior_prob=0.90,
-    senior_grad_prob=0.70,
-    race_penalty_for_retention=0.05,  # e.g. 5% penalty for Black students
-    random_retention=False,
-    base_dropout_prob=0.05,       # fallback dropout chance
-    random_seed=42
+    new_freshmen_each_fall=250,        # Base number of new freshmen
+    freshman_to_soph_prob=0.80,        # Probability freshman advances to sophomore
+    soph_to_junior_prob=0.85,          # Probability sophomore advances to junior
+    junior_to_senior_prob=0.90,        # Probability junior advances to senior
+    senior_grad_prob=0.70,             # Probability senior graduates
+    race_penalty_for_retention=0.05,   # Retention penalty for underrepresented students
+    random_retention=False,            # Use random retention (legacy parameter)
+    base_dropout_prob=0.05,            # Fallback dropout probability
+    random_seed=42                     # Random seed for reproducibility
 ):
     """
-    Generates a multi-year 'stable-ish' population across multiple Fall terms.
-    Key points:
-      - Each 'Fall' term, we add new freshmen. The exact count is varied by ±20 randomly.
-      - Each active student enrolls in some courses, we compute an average GPA for that term.
-      - Retention for the next term depends on that GPA + a small penalty if they're Black.
-      - Seniors can graduate, producing a row in 'completions' and leaving the system.
-      - We store class_year, avg_gpa, and retained_next_term in the enrollments table.
+    Generates multi-year student population data with realistic progression patterns.
 
-    Make sure your DB schema includes 'class_year' and 'avg_gpa' columns in enrollments.
+    This function creates a synthetic student population over multiple Fall terms with:
+    - New freshman cohorts each year (with ±20 variation)
+    - GPA-based retention modeling
+    - Class year progression (Freshman → Sophomore → Junior → Senior)
+    - Course enrollments with letter grades
+    - Graduations and completions tracking
+
+    Args:
+        total_years: Number of Fall terms to simulate (default: 8)
+        start_fall_year: Starting year for simulation (default: 2019)
+        new_freshmen_each_fall: Base number of new freshmen per year (default: 250)
+        freshman_to_soph_prob: Probability of freshman advancing (default: 0.80)
+        soph_to_junior_prob: Probability of sophomore advancing (default: 0.85)
+        junior_to_senior_prob: Probability of junior advancing (default: 0.90)
+        senior_grad_prob: Probability of senior graduating (default: 0.70)
+        race_penalty_for_retention: Retention penalty applied to certain demographics
+                                    (default: 0.05). Set to 0 to remove disparity.
+        random_retention: Legacy parameter, not currently used
+        base_dropout_prob: Fallback dropout probability (default: 0.05)
+        random_seed: Random seed for reproducibility (default: 42)
+
+    Returns:
+        None. Data is written directly to the SQLite database specified by DB_PATH.
+
+    Database Requirements:
+        The enrollments table must include 'class_year' and 'avg_gpa' columns.
+        Run create_ipeds_db_schema.py first to create the proper schema.
     """
 
     random.seed(random_seed)

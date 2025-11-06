@@ -1,6 +1,26 @@
+"""
+IPEDS Data AI Assistant - SQL & Python Query Interface
+
+This module provides an AI-powered interface for querying IPEDS (Integrated
+Postsecondary Education Data System) data using natural language. It uses
+OpenAI's GPT models to convert user questions into SQL queries and Python
+analysis code.
+
+Features:
+- Dynamic schema introspection from SQLite database
+- Three-step workflow: SQL generation → Python analysis → Natural language explanation
+- Automatic code fence removal from GPT responses
+- Gradio web interface for easy interaction
+
+Security Note: This script uses exec() for code execution. Use only with trusted
+inputs and in controlled environments. Not recommended for production use without
+additional security measures.
+"""
+
 import os
 import re
 import sqlite3
+import sys
 
 import openai
 import gradio as gr
@@ -11,9 +31,16 @@ import pandas as pd
 ###############################################################################
 
 DB_PATH = "ipeds_data.db"  # Path to your SQLite DB file.
-openai.api_key = os.getenv("key")
-if openai.api_key == "YOUR_OPENAI_KEY_HERE":
-    raise ValueError("Please set OPENAI_API_KEY as an environment variable or update the code.")
+
+# Get OpenAI API key from environment variable
+openai.api_key = os.getenv("OPENAI_API_KEY")
+if not openai.api_key:
+    print("ERROR: OPENAI_API_KEY environment variable not set.")
+    print("Please set it using:")
+    print("  Windows: set OPENAI_API_KEY=your_key_here")
+    print("  Mac/Linux: export OPENAI_API_KEY=your_key_here")
+    print("\nOr add it to a .env file and load it with python-dotenv")
+    sys.exit(1)
 
 ###############################################################################
 # 2. DYNAMIC SCHEMA FETCHING
@@ -254,13 +281,39 @@ def ai_assistant(user_input):
     )
 
 def main():
+    """Launch the Gradio web interface for the AI assistant."""
+    # Check if database exists
+    if not os.path.exists(DB_PATH):
+        print(f"\nERROR: Database file '{DB_PATH}' not found.")
+        print("Please run the following scripts first:")
+        print("  1. python create_ipeds_db_schema.py")
+        print("  2. python SyntheticDataforSchema2.py")
+        print("\nThis will create the database and populate it with synthetic data.")
+        sys.exit(1)
+
+    print(f"\nStarting IPEDS AI Assistant...")
+    print(f"Using database: {DB_PATH}")
+    print(f"OpenAI Model: gpt-4o")
+    print("\nLaunching Gradio interface...")
+
     iface = gr.Interface(
         fn=ai_assistant,
-        inputs=gr.Textbox(lines=3, label="Ask your IPEDS DB anything"),
-        outputs="text",
-        title="GPT Ad Hoc DB Assistant (Dynamic Schema + Fence Removal)"
+        inputs=gr.Textbox(
+            lines=3,
+            label="Ask your IPEDS DB anything",
+            placeholder="e.g., 'Show me retention rates by race/ethnicity' or 'What's the average GPA by class year?'"
+        ),
+        outputs=gr.Textbox(label="Analysis Results"),
+        title="IPEDS Data AI Assistant",
+        description="Ask questions about IPEDS student data in natural language. The AI will generate SQL queries and Python analysis code to answer your questions.",
+        examples=[
+            "What are the retention rates by race and ethnicity?",
+            "Show me the average GPA by class year",
+            "How many students graduated in each program?",
+            "What's the distribution of students across different terms?"
+        ]
     )
-    iface.launch()
+    iface.launch(share=False, server_port=7860)
 
 if __name__ == "__main__":
     main()

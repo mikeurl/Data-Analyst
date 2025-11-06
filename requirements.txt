@@ -1,0 +1,17 @@
+# IPEDS Data Analysis Toolkit - Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# Data manipulation and analysis
+pandas>=2.0.0
+numpy>=1.24.0
+
+# AI/ML for natural language queries
+openai>=1.0.0
+
+# Web interface for AI assistant
+gradio>=4.0.0
+
+# Optional: For loading environment variables from .env file
+python-dotenv>=1.0.0
+
+# Note: sqlite3 is included in Python standard library, no separate install needed
