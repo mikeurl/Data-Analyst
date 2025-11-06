@@ -328,38 +328,99 @@ def main():
     print(f"OpenAI Model: gpt-4o")
     print("\nLaunching Gradio interface...")
 
-    iface = gr.Interface(
-        fn=ai_assistant,
-        inputs=[
-            gr.Textbox(
-                lines=3,
-                label="Ask your question",
-                placeholder="e.g., 'Show me retention rates by race/ethnicity' or 'What's the average GPA by class year?'"
-            ),
-            gr.Textbox(
-                lines=1,
-                label="OpenAI API Key (optional - leave blank if set via environment variable)",
-                placeholder="sk-...",
-                type="password"
-            )
-        ],
-        outputs=gr.Textbox(
-            label="Analysis Results",
-            lines=20,
-            max_lines=50,
-            show_copy_button=True
-        ),
-        title="Higher Education AI Analyst",
-        description="Ask questions about higher education data in natural language. The AI will generate SQL queries and Python analysis code to answer your questions. Get your API key from https://platform.openai.com/api-keys",
-        examples=[
-            ["What are the retention rates by race and ethnicity?", ""],
-            ["Show me the average GPA by class year", ""],
-            ["How many students graduated in each program?", ""],
-            ["What's the distribution of students across different terms?", ""]
-        ],
-        cache_examples=False
+    # Create professional blue theme
+    theme = gr.themes.Soft(
+        primary_hue="blue",
+        secondary_hue="slate",
+        neutral_hue="slate",
     )
-    iface.launch(share=False, server_port=7860)
+
+    # Build interface using Blocks for more control
+    with gr.Blocks(theme=theme, title="Higher Education AI Analyst") as demo:
+        gr.Markdown("# Higher Education AI Analyst")
+        gr.Markdown(
+            "Ask questions about higher education data in natural language. "
+            "The AI will generate SQL queries and Python analysis code to answer your questions. "
+            "Get your API key from [platform.openai.com/api-keys](https://platform.openai.com/api-keys)"
+        )
+
+        with gr.Row():
+            with gr.Column():
+                question_input = gr.Textbox(
+                    lines=3,
+                    label="Ask your question",
+                    placeholder="e.g., 'Show me retention rates by race/ethnicity' or 'What's the average GPA by class year?'"
+                )
+                api_key_input = gr.Textbox(
+                    lines=1,
+                    label="OpenAI API Key (optional - leave blank if set via environment variable)",
+                    placeholder="sk-...",
+                    type="password"
+                )
+                submit_btn = gr.Button("Analyze", variant="primary")
+
+        with gr.Row():
+            output = gr.Textbox(
+                label="Analysis Results",
+                lines=20,
+                max_lines=50,
+                show_copy_button=True
+            )
+
+        gr.Examples(
+            examples=[
+                ["What are the retention rates by race and ethnicity?", ""],
+                ["Show me the average GPA by class year", ""],
+                ["How many students graduated in each program?", ""],
+                ["What's the distribution of students across different terms?", ""]
+            ],
+            inputs=[question_input, api_key_input],
+            outputs=output,
+            fn=ai_assistant,
+            cache_examples=False
+        )
+
+        # About section
+        with gr.Accordion("About this tool", open=False):
+            gr.Markdown("""
+### How it works
+This tool uses a three-step AI process:
+1. **SQL Generation**: Converts your question into a SQL query based on the database schema
+2. **Local Execution**: Runs the query against your local SQLite database
+3. **Python Analysis**: Generates and executes Python code for further analysis
+4. **Explanation**: Provides a human-readable summary of the results
+
+### Privacy & Data
+- All SQL execution and data analysis happens **locally on your machine**
+- Only the database schema and small data previews (5 rows) are sent to OpenAI's API
+- This installation uses **100% synthetic data** - no real student information
+
+### Production Readiness
+⚠️ **This tool is not production-ready.** It is designed for experimentation and educational purposes with synthetic data only.
+Do not use with real student data without implementing proper security measures, access controls, and compliance reviews.
+
+### Source Code
+GitHub Repository: [github.com/mikeurl/Data-Analyst](https://github.com/mikeurl/Data-Analyst)
+
+### Note
+No Ball State student data or resources were used in this project.
+            """)
+
+        # Connect the button
+        submit_btn.click(
+            fn=ai_assistant,
+            inputs=[question_input, api_key_input],
+            outputs=output
+        )
+
+        # Also allow Enter key to submit
+        question_input.submit(
+            fn=ai_assistant,
+            inputs=[question_input, api_key_input],
+            outputs=output
+        )
+
+    demo.launch(share=False, server_port=7860)
 
 if __name__ == "__main__":
     main()
