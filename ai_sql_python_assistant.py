@@ -26,6 +26,10 @@ import openai
 import gradio as gr
 import pandas as pd
 
+# Import database setup functions for auto-initialization
+from create_ipeds_db_schema import create_ipeds_db_schema
+from SyntheticDataforSchema2 import generate_stable_population_data
+
 ###############################################################################
 # 1. CONFIGURATION
 ###############################################################################
@@ -314,14 +318,30 @@ For more information, see the README.md file.
 
 def main():
     """Launch the Gradio web interface for the AI assistant."""
-    # Check if database exists
+    # Check if database exists, if not create it automatically
     if not os.path.exists(DB_PATH):
-        print(f"\nERROR: Database file '{DB_PATH}' not found.")
-        print("Please run the following scripts first:")
-        print("  1. python create_ipeds_db_schema.py")
-        print("  2. python SyntheticDataforSchema2.py")
-        print("\nThis will create the database and populate it with synthetic data.")
-        sys.exit(1)
+        print(f"\n{'='*70}")
+        print("Database not found. Generating synthetic data...")
+        print(f"{'='*70}")
+        print("This will take about 30 seconds...\n")
+
+        try:
+            # Step 1: Create schema
+            print("Step 1/2: Creating database schema...")
+            create_ipeds_db_schema(DB_PATH)
+
+            # Step 2: Generate synthetic data
+            print("Step 2/2: Generating synthetic student data...")
+            generate_stable_population_data()
+
+            print(f"\n{'='*70}")
+            print("✓ Database created successfully!")
+            print(f"{'='*70}\n")
+        except Exception as e:
+            print(f"\n{'='*70}")
+            print(f"ERROR: Failed to create database: {str(e)}")
+            print(f"{'='*70}\n")
+            sys.exit(1)
 
     print(f"\nStarting Higher Education AI Analyst...")
     print(f"Using database: {DB_PATH}")
