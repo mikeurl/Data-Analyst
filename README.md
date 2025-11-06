@@ -26,7 +26,7 @@ This toolkit provides a complete workflow for working with IPEDS-like student da
 > - **Windows**: Run `setup.bat`
 > - **Mac/Linux**: Run `./setup.sh`
 >
-> See [QUICKSTART.md](QUICKSTART.md) for instant setup instructions!
+> See [QUICKSTART.md](docs/QUICKSTART.md) for instant setup instructions!
 
 ### Prerequisites
 
@@ -59,8 +59,8 @@ Then launch with `start.bat` (Windows) or `./start.sh` (Mac/Linux)!
 ### Manual Installation
 
 If you prefer manual setup or the automated installer fails:
-- **Windows**: See [SETUP_WINDOWS.md](SETUP_WINDOWS.md)
-- **Mac/Linux**: See [SETUP_MAC.md](SETUP_MAC.md)
+- **Windows**: See [SETUP_WINDOWS.md](docs/SETUP_WINDOWS.md)
+- **Mac/Linux**: See [SETUP_MAC.md](docs/SETUP_MAC.md)
 
 ### Basic Usage (Manual)
 
@@ -102,10 +102,16 @@ Data-Analyst/
 ├── .env.example                   # Example environment variables
 ├── .gitignore                     # Git ignore rules
 │
-├── README.md                      # This file
-├── QUICKSTART.md                  # 🆕 Quick installation guide
-├── SETUP_WINDOWS.md              # Windows setup instructions
-└── SETUP_MAC.md                  # Mac/Linux setup instructions
+├── docs/                          # 📁 Documentation
+│   ├── QUICKSTART.md             # Quick installation guide
+│   ├── START_HERE.md             # Troubleshooting guide
+│   ├── INSTALL_HELP.md           # Installation help
+│   ├── WHAT_GETS_CREATED.md      # File creation guide
+│   ├── HOW_TO_MERGE.md           # Merging guide
+│   ├── SETUP_WINDOWS.md          # Windows setup instructions
+│   └── SETUP_MAC.md              # Mac/Linux setup instructions
+│
+└── README.md                      # This file
 ```
 
 ## Core Scripts
@@ -440,7 +446,7 @@ This project is provided as-is for educational and research purposes.
 
 For issues, questions, or suggestions:
 1. Check the troubleshooting section above
-2. Review the setup guides (SETUP_WINDOWS.md, SETUP_MAC.md)
+2. Review the setup guides (docs/SETUP_WINDOWS.md, docs/SETUP_MAC.md)
 3. Open an issue on the repository
 
 ---

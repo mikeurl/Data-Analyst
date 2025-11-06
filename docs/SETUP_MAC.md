@@ -1,6 +1,6 @@
-# IPEDS Data Analysis Toolkit - Windows Setup Guide
+# IPEDS Data Analysis Toolkit - Mac/Linux Setup Guide
 
-Complete step-by-step instructions for setting up and running the IPEDS Data Analysis Toolkit on Windows.
+Complete step-by-step instructions for setting up and running the IPEDS Data Analysis Toolkit on macOS and Linux.
 
 ---
 
@@ -19,29 +19,43 @@ Complete step-by-step instructions for setting up and running the IPEDS Data Ana
 
 ### 1. Check Python Installation
 
-Open **Command Prompt** (cmd) or **PowerShell** and run:
+Open **Terminal** and run:
 
-```cmd
-python --version
+```bash
+python3 --version
 ```
 
 You should see Python 3.8 or higher (e.g., `Python 3.11.5`).
 
 **If Python is not installed:**
 
-1. Download Python from [python.org](https://www.python.org/downloads/)
-2. Run the installer
-3. **IMPORTANT**: Check "Add Python to PATH" during installation
-4. Choose "Install Now"
-5. Restart Command Prompt and verify: `python --version`
+**macOS:**
+```bash
+# Install Homebrew first (if not already installed)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install Python
+brew install python3
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt update
+sudo apt install python3 python3-pip python3-venv
+```
+
+**Linux (Fedora/RHEL):**
+```bash
+sudo dnf install python3 python3-pip
+```
 
 ### 2. Check pip Installation
 
-```cmd
-pip --version
+```bash
+pip3 --version
 ```
 
-You should see pip version info. If not, Python installation may have failed.
+You should see pip version info.
 
 ### 3. Get an OpenAI API Key (for AI features)
 
@@ -61,10 +75,8 @@ You should see pip version info. If not, Python installation may have failed.
 
 **Option A: Using Git**
 
-If you have Git installed:
-
-```cmd
-cd C:\Users\YourUsername\Documents
+```bash
+cd ~/Documents
 git clone https://github.com/yourusername/Data-Analyst.git
 cd Data-Analyst
 ```
@@ -72,30 +84,30 @@ cd Data-Analyst
 **Option B: Download ZIP**
 
 1. Download the repository as a ZIP file
-2. Extract to a folder (e.g., `C:\Users\YourUsername\Documents\Data-Analyst`)
-3. Open Command Prompt and navigate to the folder:
-   ```cmd
-   cd C:\Users\YourUsername\Documents\Data-Analyst
+2. Extract to a folder (e.g., `~/Documents/Data-Analyst`)
+3. Open Terminal and navigate:
+   ```bash
+   cd ~/Documents/Data-Analyst
    ```
 
 ### Step 2: Create a Virtual Environment (Recommended)
 
 Creating a virtual environment keeps dependencies isolated:
 
-```cmd
-python -m venv venv
+```bash
+python3 -m venv venv
 ```
 
 **Activate the virtual environment:**
 
-```cmd
-venv\Scripts\activate
+```bash
+source venv/bin/activate
 ```
 
-You should see `(venv)` at the start of your command prompt.
+You should see `(venv)` at the start of your terminal prompt.
 
 **To deactivate later:**
-```cmd
+```bash
 deactivate
 ```
 
@@ -103,7 +115,7 @@ deactivate
 
 With the virtual environment activated:
 
-```cmd
+```bash
 pip install -r requirements.txt
 ```
 
@@ -115,7 +127,7 @@ This will install:
 - python-dotenv (environment variables)
 
 **Verify installation:**
-```cmd
+```bash
 pip list
 ```
 
@@ -130,13 +142,17 @@ You should see all the packages listed.
 **Option A: Using .env file (Recommended)**
 
 1. Copy the example file:
-   ```cmd
-   copy .env.example .env
+   ```bash
+   cp .env.example .env
    ```
 
-2. Open `.env` in Notepad:
-   ```cmd
-   notepad .env
+2. Edit `.env` with your preferred editor:
+   ```bash
+   nano .env
+   # or
+   vim .env
+   # or
+   open -e .env  # macOS only - opens in TextEdit
    ```
 
 3. Replace `your_openai_api_key_here` with your actual API key:
@@ -144,26 +160,33 @@ You should see all the packages listed.
    OPENAI_API_KEY=sk-your-actual-key-here
    ```
 
-4. Save and close Notepad
+4. Save and close the editor
+   - nano: `Ctrl+X`, then `Y`, then `Enter`
+   - vim: Press `Esc`, type `:wq`, press `Enter`
 
-**Option B: Set as Environment Variable**
+**Option B: Set as Environment Variable (Temporary)**
 
-```cmd
-set OPENAI_API_KEY=sk-your-actual-key-here
+```bash
+export OPENAI_API_KEY=sk-your-actual-key-here
 ```
 
-**Note:** This only works for the current Command Prompt session.
+**Note:** This only works for the current Terminal session.
 
-**Option C: Set Permanently (System-wide)**
+**Option C: Set Permanently in Shell Profile**
 
-1. Press `Windows Key + X` → Select "System"
-2. Click "Advanced system settings"
-3. Click "Environment Variables"
-4. Under "User variables", click "New"
-5. Variable name: `OPENAI_API_KEY`
-6. Variable value: `sk-your-actual-key-here`
-7. Click OK on all dialogs
-8. Restart Command Prompt
+Add to your shell configuration file:
+
+**For bash (add to `~/.bashrc` or `~/.bash_profile`):**
+```bash
+echo 'export OPENAI_API_KEY=sk-your-actual-key-here' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**For zsh (macOS default, add to `~/.zshrc`):**
+```bash
+echo 'export OPENAI_API_KEY=sk-your-actual-key-here' >> ~/.zshrc
+source ~/.zshrc
+```
 
 ---
 
@@ -171,7 +194,7 @@ set OPENAI_API_KEY=sk-your-actual-key-here
 
 ### Step 1: Create the Database Schema
 
-```cmd
+```bash
 python create_ipeds_db_schema.py
 ```
 
@@ -186,7 +209,7 @@ Database schema created or verified in 'ipeds_data.db'.
 
 ### Step 2: Generate Synthetic Data
 
-```cmd
+```bash
 python SyntheticDataforSchema2.py
 ```
 
@@ -208,7 +231,7 @@ Completions inserted: 643
 
 **Make sure your API key is configured first!**
 
-```cmd
+```bash
 python ai_sql_python_assistant.py
 ```
 
@@ -235,7 +258,7 @@ Running on local URL:  http://127.0.0.1:7860
    - "How many students graduated in each program?"
 
 **To stop the server:**
-- Press `Ctrl+C` in the Command Prompt window
+- Press `Ctrl+C` in the Terminal window
 
 ---
 
@@ -243,7 +266,7 @@ Running on local URL:  http://127.0.0.1:7860
 
 If you prefer CSV files instead of a database:
 
-```cmd
+```bash
 python generate_synthetic_data.py
 ```
 
@@ -260,7 +283,7 @@ Student-level synthetic data generated in synthetic_student_level_data.csv.
 
 To check your CSV data quality:
 
-```cmd
+```bash
 python validate_data.py
 ```
 
@@ -272,7 +295,7 @@ python validate_data.py
 
 To anonymize student IDs in a CSV file:
 
-```cmd
+```bash
 python anonymize_data.py synthetic_student_level_data.csv anonymized.csv translation.csv
 ```
 
@@ -290,31 +313,36 @@ Translation table written to: translation.csv
 
 ## Troubleshooting
 
-### "Python is not recognized as an internal or external command"
+### "command not found: python"
 
-**Solution:** Python is not in your PATH.
+**Solution:** Use `python3` instead of `python`:
 
-1. Find where Python is installed (usually `C:\Users\YourUsername\AppData\Local\Programs\Python\Python3XX`)
-2. Add it to PATH:
-   - Windows Key + X → System → Advanced system settings
-   - Environment Variables → System variables → Path → Edit
-   - Click "New" and add the Python path
-   - Also add the Scripts subfolder
-3. Restart Command Prompt
+```bash
+python3 create_ipeds_db_schema.py
+```
 
-**Or:** Reinstall Python and check "Add Python to PATH"
+**Or create an alias:**
+```bash
+alias python=python3
+```
+
+Add to `~/.bashrc` or `~/.zshrc` to make permanent.
 
 ---
 
 ### "No module named 'pandas'" (or other packages)
 
-**Solution:** Dependencies not installed.
+**Solution:** Dependencies not installed or virtual environment not activated.
 
-```cmd
-pip install -r requirements.txt
-```
+1. Make sure virtual environment is activated:
+   ```bash
+   source venv/bin/activate
+   ```
 
-Make sure your virtual environment is activated (you should see `(venv)` in the prompt).
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
 ---
 
@@ -323,8 +351,8 @@ Make sure your virtual environment is activated (you should see `(venv)` in the 
 **Solution:** API key not configured.
 
 **Quick fix (temporary):**
-```cmd
-set OPENAI_API_KEY=sk-your-key-here
+```bash
+export OPENAI_API_KEY=sk-your-key-here
 python ai_sql_python_assistant.py
 ```
 
@@ -336,7 +364,7 @@ python ai_sql_python_assistant.py
 
 **Solution:** Run schema creation first:
 
-```cmd
+```bash
 python create_ipeds_db_schema.py
 python SyntheticDataforSchema2.py
 ```
@@ -347,9 +375,20 @@ python SyntheticDataforSchema2.py
 
 **Solution:** Another program is using that port.
 
-1. Open `ai_sql_python_assistant.py` in Notepad:
-   ```cmd
-   notepad ai_sql_python_assistant.py
+**Option 1: Find and kill the process**
+```bash
+# Find what's using the port
+lsof -i :7860
+
+# Kill it (replace PID with actual process ID)
+kill -9 PID
+```
+
+**Option 2: Use a different port**
+
+1. Open `ai_sql_python_assistant.py`:
+   ```bash
+   nano ai_sql_python_assistant.py
    ```
 
 2. Find the line (near the bottom):
@@ -363,7 +402,7 @@ python SyntheticDataforSchema2.py
 
 ---
 
-### Gradio Interface Won't Open
+### Gradio Interface Won't Open Automatically
 
 **Solution:** Manually open in browser.
 
@@ -378,13 +417,38 @@ Copy that URL and paste it into your browser.
 
 ### "Permission denied" when creating database
 
-**Solution:** Run Command Prompt as Administrator.
+**Solution:** Check file/directory permissions.
 
-1. Press Windows Key
-2. Type "cmd"
-3. Right-click "Command Prompt"
-4. Select "Run as administrator"
-5. Navigate to your project folder and try again
+```bash
+# Make sure you have write permissions
+ls -la
+
+# If needed, fix permissions
+chmod 755 .
+```
+
+---
+
+### macOS: "Python quit unexpectedly"
+
+**Solution:** Install Python properly through Homebrew, not the system Python.
+
+```bash
+brew install python3
+```
+
+Then create a new virtual environment with the Homebrew Python.
+
+---
+
+### Linux: "Unable to locate package python3-pip"
+
+**Solution:** Update package lists first.
+
+```bash
+sudo apt update
+sudo apt install python3-pip
+```
 
 ---
 
@@ -414,10 +478,24 @@ Copy that URL and paste it into your browser.
 
 **Option 2: Using SQL Directly**
 
-Install a SQLite browser:
-- Download [DB Browser for SQLite](https://sqlitebrowser.org/dl/)
+**macOS:**
+- Install [DB Browser for SQLite](https://sqlitebrowser.org/dl/)
 - Open `ipeds_data.db`
-- Write SQL queries in the "Execute SQL" tab
+
+**Linux:**
+```bash
+sudo apt install sqlitebrowser  # Ubuntu/Debian
+# or
+sudo dnf install sqlitebrowser  # Fedora
+```
+
+**Command-line SQLite:**
+```bash
+sqlite3 ipeds_data.db
+.tables
+SELECT * FROM students LIMIT 5;
+.quit
+```
 
 **Option 3: Using Python**
 
@@ -445,7 +523,7 @@ conn.close()
 ```
 
 Run it:
-```cmd
+```bash
 python my_analysis.py
 ```
 
@@ -463,7 +541,7 @@ race_penalty_for_retention=0.05    # Set to 0 for no disparity
 ```
 
 Then regenerate data:
-```cmd
+```bash
 python SyntheticDataforSchema2.py
 ```
 
@@ -485,36 +563,68 @@ Requires: `pip install openpyxl`
 
 ---
 
+### Create Shell Aliases for Common Tasks
+
+Add to `~/.bashrc` or `~/.zshrc`:
+
+```bash
+# IPEDS shortcuts
+alias ipeds-activate='cd ~/Documents/Data-Analyst && source venv/bin/activate'
+alias ipeds-reset='rm ipeds_data.db && python create_ipeds_db_schema.py && python SyntheticDataforSchema2.py'
+alias ipeds-ai='python ai_sql_python_assistant.py'
+```
+
+Then use:
+```bash
+ipeds-activate  # Navigate to project and activate environment
+ipeds-reset     # Regenerate all data
+ipeds-ai        # Launch AI assistant
+```
+
+---
+
 ## Quick Reference
 
 ### Start a New Analysis Session
 
-```cmd
-cd C:\Users\YourUsername\Documents\Data-Analyst
-venv\Scripts\activate
+```bash
+cd ~/Documents/Data-Analyst
+source venv/bin/activate
 python ai_sql_python_assistant.py
 ```
 
 ### Regenerate All Data
 
-```cmd
-del ipeds_data.db
+```bash
+rm ipeds_data.db
 python create_ipeds_db_schema.py
 python SyntheticDataforSchema2.py
 ```
 
 ### Update Dependencies
 
-```cmd
+```bash
 pip install --upgrade -r requirements.txt
+```
+
+### Check Database Size
+
+```bash
+ls -lh ipeds_data.db
+```
+
+### Quick SQL Query
+
+```bash
+sqlite3 ipeds_data.db "SELECT COUNT(*) FROM students;"
 ```
 
 ---
 
 ## Additional Resources
 
-- **Main README**: [README.md](README.md)
-- **Mac Setup**: [SETUP_MAC.md](SETUP_MAC.md)
+- **Main README**: [README.md](../README.md)
+- **Windows Setup**: [SETUP_WINDOWS.md](SETUP_WINDOWS.md)
 - **OpenAI Docs**: https://platform.openai.com/docs
 - **Pandas Docs**: https://pandas.pydata.org/docs
 - **SQLite Tutorial**: https://www.sqlitetutorial.net
@@ -525,10 +635,11 @@ pip install --upgrade -r requirements.txt
 
 If you encounter issues not covered here:
 
-1. Check the main [README.md](README.md) troubleshooting section
+1. Check the main [README.md](../README.md) troubleshooting section
 2. Verify all prerequisites are installed correctly
-3. Try running scripts one at a time
-4. Check error messages carefully - they often indicate the problem
+3. Make sure virtual environment is activated (`source venv/bin/activate`)
+4. Try running scripts one at a time
+5. Check error messages carefully - they often indicate the problem
 
 ---
 

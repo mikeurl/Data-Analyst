@@ -297,4 +297,4 @@ The installer doesn't modify system settings or install global packages.
 
 ---
 
-**Ready to dive deeper?** Check out [README.md](README.md) for complete documentation!
+**Ready to dive deeper?** Check out [README.md](../README.md) for complete documentation!
