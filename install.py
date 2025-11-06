@@ -300,8 +300,8 @@ def print_next_steps():
 
     print(f"{Colors.BOLD}Documentation:{Colors.ENDC}\n")
     print(f"   • README.md - Full documentation")
-    print(f"   • SETUP_WINDOWS.md - Windows guide")
-    print(f"   • SETUP_MAC.md - Mac/Linux guide\n")
+    print(f"   • docs/SETUP_WINDOWS.md - Windows guide")
+    print(f"   • docs/SETUP_MAC.md - Mac/Linux guide\n")
 
     if not Path(".env").exists() or Path(".env").stat().st_size < 50:
         print_warning("Remember to configure your OpenAI API key in .env file!")
