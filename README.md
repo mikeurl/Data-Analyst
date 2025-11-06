@@ -22,18 +22,47 @@ This toolkit provides a complete workflow for working with IPEDS-like student da
 
 ## Quick Start
 
+> **🚀 NEW: Automated Installer!** Get up and running in under 5 minutes with one command:
+> - **Windows**: Run `setup.bat`
+> - **Mac/Linux**: Run `./setup.sh`
+>
+> See [QUICKSTART.md](QUICKSTART.md) for instant setup instructions!
+
 ### Prerequisites
 
 - Python 3.8 or higher
-- OpenAI API key (for AI assistant features)
+- OpenAI API key (for AI assistant features - optional, can add later)
 
-### Installation
+### Automated Installation (Recommended)
 
-See platform-specific setup guides:
-- **Windows**: [SETUP_WINDOWS.md](SETUP_WINDOWS.md)
-- **Mac/Linux**: [SETUP_MAC.md](SETUP_MAC.md)
+**Windows:**
+```cmd
+setup.bat
+```
 
-### Basic Usage
+**Mac/Linux:**
+```bash
+chmod +x setup.sh
+./setup.sh
+```
+
+The installer will:
+- ✓ Check Python version
+- ✓ Create virtual environment
+- ✓ Install dependencies
+- ✓ Configure API key
+- ✓ Create database
+- ✓ Generate sample data
+
+Then launch with `start.bat` (Windows) or `./start.sh` (Mac/Linux)!
+
+### Manual Installation
+
+If you prefer manual setup or the automated installer fails:
+- **Windows**: See [SETUP_WINDOWS.md](SETUP_WINDOWS.md)
+- **Mac/Linux**: See [SETUP_MAC.md](SETUP_MAC.md)
+
+### Basic Usage (Manual)
 
 1. **Create the database schema:**
    ```bash
@@ -56,6 +85,12 @@ See platform-specific setup guides:
 ```
 Data-Analyst/
 │
+├── install.py                     # 🆕 Automated installer (cross-platform)
+├── setup.bat                      # 🆕 Windows quick installer
+├── setup.sh                       # 🆕 Mac/Linux quick installer
+├── start.bat                      # 🆕 Windows quick launcher
+├── start.sh                       # 🆕 Mac/Linux quick launcher
+│
 ├── create_ipeds_db_schema.py      # Creates SQLite database schema
 ├── SyntheticDataforSchema2.py     # Generates synthetic student data (DB)
 ├── generate_synthetic_data.py     # Generates synthetic student data (CSV)
@@ -68,6 +103,7 @@ Data-Analyst/
 ├── .gitignore                     # Git ignore rules
 │
 ├── README.md                      # This file
+├── QUICKSTART.md                  # 🆕 Quick installation guide
 ├── SETUP_WINDOWS.md              # Windows setup instructions
 └── SETUP_MAC.md                  # Mac/Linux setup instructions
 ```
