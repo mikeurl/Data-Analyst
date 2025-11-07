@@ -348,36 +348,47 @@ def main():
     custom_css = """
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
+    :root {
+        color-scheme: dark;
+    }
+
     /* Base styling */
     .gradio-container {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
-        background: #f9fafb !important;
+        background: #0b1120 !important;
+        color: #e2e8f0 !important;
         padding: 0 !important;
         max-width: 100% !important;
+    }
+
+    .gradio-container * {
+        color: inherit;
     }
 
     /* Two-column layout */
     .two-column-container {
         display: grid !important;
-        grid-template-columns: 450px 1fr !important;
+        grid-template-columns: 420px 1fr !important;
         gap: 0 !important;
         min-height: 100vh !important;
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(8, 47, 73, 0.9)) !important;
     }
 
     /* Left column - input side */
     .left-column {
-        background: white !important;
-        border-right: 1px solid #e5e7eb !important;
-        padding: 32px 24px !important;
+        background: rgba(17, 24, 39, 0.88) !important;
+        border-right: 1px solid rgba(148, 163, 184, 0.12) !important;
+        padding: 32px 28px !important;
         overflow-y: auto !important;
         display: flex !important;
         flex-direction: column !important;
+        backdrop-filter: blur(12px);
     }
 
     /* Right column - output side */
     .right-column {
-        background: #f9fafb !important;
-        padding: 32px 24px !important;
+        background: rgba(9, 17, 31, 0.82) !important;
+        padding: 36px 32px !important;
         overflow-y: auto !important;
     }
 
@@ -386,140 +397,144 @@ def main():
         text-align: center !important;
         margin-bottom: 32px !important;
         padding-bottom: 24px !important;
-        border-bottom: 1px solid #f3f4f6 !important;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.18) !important;
     }
 
     .header-section img {
         max-width: 48px !important;
         height: auto !important;
         margin: 0 auto 12px auto !important;
-        opacity: 0.9 !important;
+        filter: drop-shadow(0 8px 12px rgba(15, 23, 42, 0.45));
     }
 
     .header-section h1 {
-        font-size: 1.25rem !important;
+        font-size: 1.35rem !important;
         font-weight: 600 !important;
-        color: #111827 !important;
+        color: #f8fafc !important;
         margin: 0 0 4px 0 !important;
     }
 
     .header-section p {
-        font-size: 0.875rem !important;
-        color: #6b7280 !important;
+        font-size: 0.85rem !important;
+        color: #94a3b8 !important;
         margin: 0 !important;
+        letter-spacing: 0.08em !important;
+        text-transform: uppercase !important;
     }
 
     /* Question input */
     #question-input textarea {
-        background: white !important;
-        border: 1px solid #d1d5db !important;
-        border-radius: 12px !important;
-        color: #111827 !important;
+        background: rgba(15, 23, 42, 0.9) !important;
+        border: 1px solid rgba(148, 163, 184, 0.28) !important;
+        border-radius: 16px !important;
+        color: #f8fafc !important;
         font-size: 1rem !important;
-        padding: 16px !important;
+        padding: 18px 16px !important;
         min-height: 140px !important;
         resize: vertical !important;
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
-        transition: border-color 0.15s ease !important;
+        box-shadow: inset 0 1px 0 0 rgba(148, 163, 184, 0.05) !important;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
     }
 
     #question-input textarea:focus {
-        border-color: #10a37f !important;
+        border-color: #38bdf8 !important;
         outline: none !important;
-        box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1) !important;
+        box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2) !important;
     }
 
     /* Example buttons */
     .examples-label {
         font-size: 0.75rem !important;
         font-weight: 500 !important;
-        color: #6b7280 !important;
+        color: #94a3b8 !important;
         text-transform: uppercase !important;
-        letter-spacing: 0.05em !important;
-        margin: 20px 0 12px 0 !important;
+        letter-spacing: 0.08em !important;
+        margin: 24px 0 12px 0 !important;
     }
 
     .example-row {
         display: grid !important;
         grid-template-columns: 1fr 1fr !important;
-        gap: 8px !important;
-        margin-bottom: 20px !important;
+        gap: 10px !important;
+        margin-bottom: 18px !important;
     }
 
     .example-button button {
-        background: #f9fafb !important;
-        border: 1px solid #e5e7eb !important;
-        border-radius: 8px !important;
-        padding: 10px 14px !important;
-        font-size: 0.875rem !important;
-        color: #374151 !important;
+        background: rgba(30, 41, 59, 0.72) !important;
+        border: 1px solid rgba(148, 163, 184, 0.16) !important;
+        border-radius: 10px !important;
+        padding: 12px 14px !important;
+        font-size: 0.85rem !important;
+        color: #e2e8f0 !important;
         cursor: pointer !important;
-        transition: all 0.15s ease !important;
+        transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease !important;
         text-align: center !important;
         font-weight: 400 !important;
         width: 100% !important;
     }
 
     .example-button button:hover {
-        background: white !important;
-        border-color: #10a37f !important;
-        color: #111827 !important;
+        background: rgba(59, 130, 246, 0.18) !important;
+        border-color: rgba(59, 130, 246, 0.45) !important;
+        box-shadow: 0 10px 22px -15px rgba(59, 130, 246, 0.6) !important;
+        transform: translateY(-1px);
     }
 
     /* Submit button */
     button[variant="primary"] {
-        background: #10a37f !important;
+        background: linear-gradient(135deg, #6366f1, #38bdf8) !important;
         color: white !important;
         font-weight: 500 !important;
-        font-size: 0.875rem !important;
+        font-size: 0.9rem !important;
         padding: 12px 24px !important;
-        border-radius: 8px !important;
+        border-radius: 10px !important;
         border: none !important;
         cursor: pointer !important;
-        transition: all 0.15s ease !important;
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+        transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+        box-shadow: 0 12px 22px -12px rgba(99, 102, 241, 0.7) !important;
         width: 100% !important;
-        margin: 20px 0 !important;
+        margin: 22px 0 !important;
     }
 
     button[variant="primary"]:hover {
-        background: #0d8f6f !important;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+        transform: translateY(-1px);
+        box-shadow: 0 16px 28px -14px rgba(59, 130, 246, 0.75) !important;
     }
 
     /* API key section */
     .api-section {
-        background: #f9fafb !important;
-        border: 1px solid #e5e7eb !important;
-        border-radius: 8px !important;
-        padding: 16px !important;
+        background: rgba(15, 23, 42, 0.8) !important;
+        border: 1px solid rgba(148, 163, 184, 0.12) !important;
+        border-radius: 12px !important;
+        padding: 18px !important;
         margin: 20px 0 !important;
+        box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.05) !important;
     }
 
     #api-key-input input {
-        background: white !important;
-        border: 1px solid #d1d5db !important;
-        border-radius: 6px !important;
-        color: #111827 !important;
-        font-size: 0.875rem !important;
-        padding: 10px 12px !important;
+        background: rgba(15, 23, 42, 0.9) !important;
+        border: 1px solid rgba(148, 163, 184, 0.2) !important;
+        border-radius: 8px !important;
+        color: #e0f2fe !important;
+        font-size: 0.85rem !important;
+        padding: 12px 14px !important;
         font-family: 'SF Mono', Monaco, monospace !important;
     }
 
     #api-key-input input:focus {
-        border-color: #10a37f !important;
+        border-color: rgba(56, 189, 248, 0.6) !important;
         outline: none !important;
-        box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1) !important;
+        box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2) !important;
     }
 
     .api-info {
         font-size: 0.75rem !important;
-        color: #6b7280 !important;
-        margin-top: 8px !important;
+        color: #94a3b8 !important;
+        margin-top: 10px !important;
     }
 
     .api-info a {
-        color: #10a37f !important;
+        color: #38bdf8 !important;
         text-decoration: none !important;
     }
 
@@ -529,60 +544,63 @@ def main():
 
     /* Output results */
     #output-results {
-        height: calc(100vh - 64px) !important;
+        height: auto !important;
     }
 
     #output-results textarea {
-        background: white !important;
-        border: 1px solid #d1d5db !important;
-        border-radius: 12px !important;
-        padding: 16px !important;
-        min-height: calc(100vh - 120px) !important;
+        background: rgba(15, 23, 42, 0.85) !important;
+        border: 1px solid rgba(148, 163, 184, 0.18) !important;
+        border-radius: 16px !important;
+        padding: 18px !important;
+        min-height: 260px !important;
+        max-height: 420px !important;
         font-family: 'SF Mono', Monaco, 'Courier New', monospace !important;
-        font-size: 0.875rem !important;
-        line-height: 1.6 !important;
-        color: #111827 !important;
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+        font-size: 0.9rem !important;
+        line-height: 1.55 !important;
+        color: #f8fafc !important;
+        box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.06) !important;
+        overflow-y: auto !important;
     }
 
     /* About accordion */
     details {
-        background: #f9fafb !important;
-        border: 1px solid #e5e7eb !important;
-        border-radius: 8px !important;
-        padding: 12px !important;
+        background: rgba(30, 41, 59, 0.72) !important;
+        border: 1px solid rgba(148, 163, 184, 0.12) !important;
+        border-radius: 12px !important;
+        padding: 16px !important;
         margin-top: auto !important;
         margin-top: 24px !important;
+        box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.04) !important;
     }
 
     summary {
         font-weight: 500 !important;
-        font-size: 0.875rem !important;
-        color: #374151 !important;
+        font-size: 0.9rem !important;
+        color: #cbd5f5 !important;
         cursor: pointer !important;
     }
 
     details[open] summary {
         margin-bottom: 12px !important;
         padding-bottom: 12px !important;
-        border-bottom: 1px solid #e5e7eb !important;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.18) !important;
     }
 
     details p, details li {
-        color: #4b5563 !important;
+        color: #cbd5f5 !important;
         line-height: 1.6 !important;
-        font-size: 0.875rem !important;
+        font-size: 0.85rem !important;
     }
 
     details h3 {
-        color: #111827 !important;
-        font-size: 0.875rem !important;
+        color: #e0f2fe !important;
+        font-size: 0.9rem !important;
         font-weight: 600 !important;
         margin: 12px 0 6px 0 !important;
     }
 
     details a {
-        color: #10a37f !important;
+        color: #38bdf8 !important;
         text-decoration: none !important;
     }
 
@@ -598,11 +616,12 @@ def main():
 
         .left-column {
             border-right: none !important;
-            border-bottom: 1px solid #e5e7eb !important;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important;
         }
 
         #output-results textarea {
-            min-height: 400px !important;
+            min-height: 220px !important;
+            max-height: 340px !important;
         }
     }
     """
@@ -732,7 +751,7 @@ Do not deploy with real student data without implementing:
             with gr.Column(elem_classes=["right-column"], scale=2):
                 output = gr.Textbox(
                     label="Results",
-                    lines=30,
+                    lines=12,
                     show_copy_button=True,
                     elem_id="output-results",
                     interactive=False
