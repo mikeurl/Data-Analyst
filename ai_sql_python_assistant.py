@@ -22,7 +22,7 @@ import re
 import sqlite3
 import sys
 
-import openai
+from openai import OpenAI
 import gradio as gr
 import pandas as pd
 
@@ -36,9 +36,9 @@ from SyntheticDataforSchema2 import generate_stable_population_data
 
 DB_PATH = "ipeds_data.db"  # Path to your SQLite DB file.
 
-# Get OpenAI API key from environment variable
-openai.api_key = os.getenv("OPENAI_API_KEY")
-if not openai.api_key:
+# Get OpenAI API key from environment variable - will create client when needed
+DEFAULT_API_KEY = os.getenv("OPENAI_API_KEY")
+if not DEFAULT_API_KEY:
     print("\n" + "="*70)
     print("WARNING: OPENAI_API_KEY environment variable not set.")
     print("="*70)
@@ -159,7 +159,7 @@ def run_python_code(py_code, df):
 # 4. GPT INTERACTION
 ###############################################################################
 
-def ask_gpt_for_sql(user_question):
+def ask_gpt_for_sql(user_question, client):
     """
     1) Fetch the live schema from the DB.
     2) Prompt GPT to write a SQL query (SQLite syntax) with no code fences.
@@ -178,14 +178,14 @@ The user wants the following:
 
 Please provide ONLY the SQL code, no triple backticks. End with a semicolon.
 """
-    response = openai.ChatCompletion.create(
-        model="gpt-4o",  # or "gpt-4" if you have access
+    response = client.chat.completions.create(
+        model="gpt-4o",
         messages=[{"role": "system", "content": prompt}],
         temperature=0.0
     )
-    return response["choices"][0]["message"]["content"]
+    return response.choices[0].message.content
 
-def ask_gpt_for_python(user_question, df_preview):
+def ask_gpt_for_python(user_question, df_preview, client):
     """
     Tells GPT: "We have a pandas DataFrame named 'df' from the SQL result.
     Provide Python code for further analysis, no triple backticks."
@@ -200,14 +200,14 @@ Preview of df:
 Write Python code that uses 'df' to further explore or summarize the data.
 Store final output in a variable named 'result'. Return ONLY the code (no triple backticks).
 """
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "system", "content": prompt}],
         temperature=0.2
     )
-    return response["choices"][0]["message"]["content"]
+    return response.choices[0].message.content
 
-def ask_gpt_for_explanation(sql_code, sql_result_str, py_code, py_result_str):
+def ask_gpt_for_explanation(sql_code, sql_result_str, py_code, py_result_str, client):
     """
     Combine everything into a final explanation for the user.
     """
@@ -228,12 +228,12 @@ We had the following steps:
 
 Provide a concise, friendly explanation of these results for the user.
 """
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "system", "content": prompt}],
         temperature=0.3
     )
-    return response["choices"][0]["message"]["content"]
+    return response.choices[0].message.content
 
 ###############################################################################
 # 5. GRADIO INTERFACE
@@ -246,8 +246,8 @@ def ai_assistant(user_input, api_key_input):
     3) GPT -> Python code, remove fences, run the code.
     4) GPT -> final explanation.
     """
-    # Use the API key from input if provided, otherwise use the global one
-    active_api_key = api_key_input.strip() if api_key_input and api_key_input.strip() else openai.api_key
+    # Use the API key from input if provided, otherwise use the default one
+    active_api_key = api_key_input.strip() if api_key_input and api_key_input.strip() else DEFAULT_API_KEY
 
     # Check if API key is set
     if not active_api_key:
@@ -266,55 +266,51 @@ Steps to get started:
 For more information, see the README.md file.
 """
 
-    # Temporarily set the API key for this request
-    original_key = openai.api_key
-    openai.api_key = active_api_key
+    # Create OpenAI client with the API key
+    client = OpenAI(api_key=active_api_key)
 
-    try:
-        # Step A: GPT for SQL
-        raw_sql_code = ask_gpt_for_sql(user_input)
-        # Clean out triple backticks or ```sql
-        sql_code_clean = remove_sql_fences(raw_sql_code)
+    # Step A: GPT for SQL
+    raw_sql_code = ask_gpt_for_sql(user_input, client)
+    # Clean out triple backticks or ```sql
+    sql_code_clean = remove_sql_fences(raw_sql_code)
 
-        # Execute
-        df_or_error = run_sql(sql_code_clean)
-        if isinstance(df_or_error, str) and df_or_error.startswith("SQL Error:"):
-            # The SQL failed
-            explanation = f"SQL query failed:\n{df_or_error}\n\nSQL was:\n{sql_code_clean}"
-            return explanation
+    # Execute
+    df_or_error = run_sql(sql_code_clean)
+    if isinstance(df_or_error, str) and df_or_error.startswith("SQL Error:"):
+        # The SQL failed
+        explanation = f"SQL query failed:\n{df_or_error}\n\nSQL was:\n{sql_code_clean}"
+        return explanation
 
-        # Build a short preview of the DataFrame
-        if isinstance(df_or_error, pd.DataFrame):
-            preview = df_or_error.head().to_string(index=False)
-            cols_list = df_or_error.columns.tolist()
-            df_preview_str = f"Columns: {cols_list}\nFirst 5 rows:\n{preview}"
-        else:
-            df_preview_str = str(df_or_error)
+    # Build a short preview of the DataFrame
+    if isinstance(df_or_error, pd.DataFrame):
+        preview = df_or_error.head().to_string(index=False)
+        cols_list = df_or_error.columns.tolist()
+        df_preview_str = f"Columns: {cols_list}\nFirst 5 rows:\n{preview}"
+    else:
+        df_preview_str = str(df_or_error)
 
-        # Step B: GPT for Python
-        raw_py_code = ask_gpt_for_python(user_input, df_preview_str)
-        py_code_clean = remove_python_fences(raw_py_code)
+    # Step B: GPT for Python
+    raw_py_code = ask_gpt_for_python(user_input, df_preview_str, client)
+    py_code_clean = remove_python_fences(raw_py_code)
 
-        py_result = run_python_code(py_code_clean, df_or_error)
+    py_result = run_python_code(py_code_clean, df_or_error)
 
-        # Step C: GPT final explanation
-        final_explanation = ask_gpt_for_explanation(
-            sql_code_clean,
-            df_preview_str,
-            py_code_clean,
-            py_result
-        )
+    # Step C: GPT final explanation
+    final_explanation = ask_gpt_for_explanation(
+        sql_code_clean,
+        df_preview_str,
+        py_code_clean,
+        py_result,
+        client
+    )
 
-        return (
-            f"[SQL CODE]\n{sql_code_clean}\n\n"
-            f"[SQL RESULT PREVIEW]\n{df_preview_str}\n\n"
-            f"[PYTHON CODE]\n{py_code_clean}\n\n"
-            f"[PYTHON RESULT]\n{py_result}\n\n"
-            f"[GPT EXPLANATION]\n{final_explanation}"
-        )
-    finally:
-        # Restore original API key
-        openai.api_key = original_key
+    return (
+        f"[SQL CODE]\n{sql_code_clean}\n\n"
+        f"[SQL RESULT PREVIEW]\n{df_preview_str}\n\n"
+        f"[PYTHON CODE]\n{py_code_clean}\n\n"
+        f"[PYTHON RESULT]\n{py_result}\n\n"
+        f"[GPT EXPLANATION]\n{final_explanation}"
+    )
 
 def main():
     """Launch the Gradio web interface for the AI assistant."""
