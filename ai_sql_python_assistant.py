@@ -395,6 +395,7 @@ def main():
     /* ChatGPT-style input box */
     #question-input {
         margin-bottom: 24px !important;
+        display: block !important;
     }
 
     #question-input label {
@@ -409,9 +410,14 @@ def main():
         font-size: 1rem !important;
         line-height: 1.5 !important;
         padding: 16px !important;
-        resize: none !important;
+        min-height: 120px !important;
+        height: auto !important;
+        resize: vertical !important;
         box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
         transition: all 0.15s ease !important;
+        width: 100% !important;
+        display: block !important;
+        pointer-events: auto !important;
     }
 
     #question-input textarea::placeholder {
