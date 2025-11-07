@@ -344,323 +344,37 @@ def main():
     print(f"OpenAI Model: gpt-4o")
     print("\nLaunching Gradio interface...")
 
-    # ChatGPT-style interface - clean, minimal, focused
+    # Simplified safe CSS to avoid accidental overlays that can make inputs uneditable.
+    # The previous very large CSS block could unintentionally overlap elements or set
+    # layout rules that made the textarea non-interactive in some Gradio versions.
     custom_css = """
-    /* ChatGPT aesthetic - clean and minimal */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
-
-    /* Clean light background like ChatGPT */
+    /* Minimal safe styles */
     .gradio-container {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
         background: #f9fafb !important;
-        padding: 0 !important;
-        min-height: 100vh !important;
+        padding: 12px !important;
     }
-
-    /* Centered column like ChatGPT */
-    .main-wrapper {
-        max-width: 768px !important;
-        margin: 0 auto !important;
-        padding: 24px 16px !important;
-    }
-
-    /* Clean header */
-    .header-section {
-        text-align: center !important;
-        padding: 32px 0 24px 0 !important;
-        border-bottom: 1px solid #e5e7eb !important;
-        margin-bottom: 32px !important;
-    }
-
-    .header-section img {
-        max-width: 48px !important;
-        height: auto !important;
-        margin: 0 auto 16px auto !important;
-        opacity: 0.9 !important;
-    }
-
-    .header-section h1 {
-        font-size: 1.25rem !important;
-        font-weight: 600 !important;
-        color: #111827 !important;
-        margin: 0 !important;
-    }
-
-    .header-section p {
-        font-size: 0.875rem !important;
-        color: #6b7280 !important;
-        margin: 8px 0 0 0 !important;
-    }
-
-    /* ChatGPT-style input box using ID */
-    #question-input {
-        margin-bottom: 24px !important;
-    }
-
-    #question-input label {
-        display: none !important;
-    }
-
-    /* Target Gradio's actual textarea element */
     #question-input textarea {
         background: white !important;
         border: 1px solid #d1d5db !important;
         border-radius: 12px !important;
         color: #111827 !important;
         font-size: 1rem !important;
-        line-height: 1.5 !important;
-        padding: 16px !important;
+        padding: 12px !important;
         min-height: 120px !important;
         resize: vertical !important;
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
-        transition: all 0.15s ease !important;
     }
-
-    #question-input textarea::placeholder {
-        color: #9ca3af !important;
-    }
-
-    #question-input textarea:focus {
-        border-color: #10a37f !important;
-        outline: none !important;
-        box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1) !important;
-    }
-
-    /* Example prompts - minimal chips */
-    .examples-wrapper {
-        margin-bottom: 24px !important;
-    }
-
-    .examples-label {
-        font-size: 0.75rem !important;
-        font-weight: 500 !important;
-        color: #6b7280 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.05em !important;
-        margin-bottom: 12px !important;
-    }
-
-    .example-chips {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 8px !important;
-        margin-bottom: 0 !important;
-    }
-
-    /* Target Gradio buttons with example-chip class */
-    .example-chip button {
-        background: white !important;
-        border: 1px solid #e5e7eb !important;
-        border-radius: 8px !important;
-        padding: 12px 16px !important;
-        font-size: 0.875rem !important;
-        color: #374151 !important;
-        cursor: pointer !important;
-        transition: all 0.15s ease !important;
-        text-align: center !important;
-        font-weight: 400 !important;
-        min-width: 150px !important;
-    }
-
-    .example-chip button:hover {
-        background: #f9fafb !important;
-        border-color: #10a37f !important;
-        color: #111827 !important;
-    }
-
-    /* ChatGPT green button */
-    button[variant="primary"] {
-        background: #10a37f !important;
-        color: white !important;
-        font-weight: 500 !important;
-        font-size: 0.875rem !important;
-        padding: 12px 24px !important;
-        border-radius: 8px !important;
-        border: none !important;
-        cursor: pointer !important;
-        transition: all 0.15s ease !important;
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
-        width: 100% !important;
-        margin-bottom: 16px !important;
-    }
-
-    button[variant="primary"]:hover {
-        background: #0d8f6f !important;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
-    }
-
-    button[variant="primary"]:active {
-        background: #0b7a5f !important;
-    }
-
-    /* API key section - minimal */
-    .api-wrapper {
-        background: #f3f4f6 !important;
-        border: 1px solid #e5e7eb !important;
-        border-radius: 8px !important;
-        padding: 16px !important;
-        margin-bottom: 24px !important;
-    }
-
-    #api-key-input label {
-        font-size: 0.75rem !important;
-        font-weight: 500 !important;
-        color: #6b7280 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.05em !important;
-        margin-bottom: 8px !important;
-    }
-
-    #api-key-input input {
-        background: white !important;
-        border: 1px solid #d1d5db !important;
-        border-radius: 6px !important;
-        color: #111827 !important;
-        font-size: 0.875rem !important;
-        padding: 10px 12px !important;
-        font-family: 'SF Mono', Monaco, monospace !important;
-    }
-
-    #api-key-input input:focus {
-        border-color: #10a37f !important;
-        outline: none !important;
-        box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1) !important;
-    }
-
-    .api-info {
-        font-size: 0.75rem !important;
-        color: #6b7280 !important;
-        margin-top: 8px !important;
-        line-height: 1.5 !important;
-    }
-
-    .api-info a {
-        color: #10a37f !important;
-        text-decoration: none !important;
-        font-weight: 500 !important;
-    }
-
-    .api-info a:hover {
-        text-decoration: underline !important;
-    }
-
-    /* Results section - clean */
-    #output-results {
-        margin-top: 32px !important;
-    }
-
-    #output-results label {
-        font-size: 0.875rem !important;
-        font-weight: 600 !important;
-        color: #111827 !important;
-        margin-bottom: 12px !important;
-    }
-
     #output-results textarea {
         background: white !important;
         border: 1px solid #d1d5db !important;
-        border-radius: 12px !important;
-        color: #111827 !important;
-        font-family: 'SF Mono', Monaco, 'Courier New', monospace !important;
-        font-size: 0.875rem !important;
-        line-height: 1.7 !important;
-        padding: 16px !important;
-        min-height: 400px !important;
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
-    }
-
-    /* About section - minimal accordion */
-    details {
-        background: white !important;
-        border: 1px solid #e5e7eb !important;
         border-radius: 8px !important;
-        padding: 16px !important;
-        margin-top: 32px !important;
-    }
-
-    summary {
-        font-weight: 500 !important;
-        font-size: 0.875rem !important;
-        color: #374151 !important;
-        cursor: pointer !important;
-        list-style: none !important;
-    }
-
-    summary::-webkit-details-marker {
-        display: none !important;
-    }
-
-    summary:hover {
-        color: #111827 !important;
-    }
-
-    details[open] summary {
-        margin-bottom: 16px !important;
-        padding-bottom: 12px !important;
-        border-bottom: 1px solid #f3f4f6 !important;
-    }
-
-    details p, details li {
-        color: #4b5563 !important;
-        line-height: 1.6 !important;
-        font-size: 0.875rem !important;
-    }
-
-    details h3 {
-        color: #111827 !important;
-        font-size: 0.875rem !important;
-        font-weight: 600 !important;
-        margin: 16px 0 8px 0 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.025em !important;
-    }
-
-    details h3:first-of-type {
-        margin-top: 0 !important;
-    }
-
-    details a {
-        color: #10a37f !important;
-        text-decoration: none !important;
-        font-weight: 500 !important;
-    }
-
-    details a:hover {
-        text-decoration: underline !important;
-    }
-
-    /* Clean scrollbar */
-    ::-webkit-scrollbar {
-        width: 8px !important;
-        height: 8px !important;
-    }
-
-    ::-webkit-scrollbar-track {
-        background: transparent !important;
-    }
-
-    ::-webkit-scrollbar-thumb {
-        background: #d1d5db !important;
-        border-radius: 4px !important;
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-        background: #9ca3af !important;
-    }
-
-    /* Responsive */
-    @media (max-width: 640px) {
-        .main-wrapper {
-            padding: 16px 12px !important;
-        }
-
-        .example-chips {
-            grid-template-columns: 1fr !important;
-        }
+        padding: 12px !important;
+        min-height: 300px !important;
+        font-family: 'SF Mono', Monaco, monospace !important;
     }
     """
 
-    # Create elegant dark theme
+    # Create elegant dark theme (kept minimal)
     theme = gr.themes.Base(
         primary_hue="stone",
         secondary_hue="stone",
@@ -790,31 +504,31 @@ Do not deploy with real student data without implementing:
             outputs=output
         )
 
-        # Also allow Enter key to submit
+        # Also allow Enter key to submit (Enter will submit the form; multiline will use Shift+Enter for newline)
         question_input.submit(
             fn=ai_assistant,
             inputs=[question_input, api_key_input],
             outputs=output
         )
 
-        # Connect example buttons to populate the question input
+        # Connect example buttons to populate the question input using gr.update which is robust across gradio versions
         example1.click(
-            fn=lambda: "What are the retention rates by race and ethnicity?",
+            fn=lambda: gr.update(value="What are the retention rates by race and ethnicity?"),
             inputs=None,
             outputs=question_input
         )
         example2.click(
-            fn=lambda: "Show me the average GPA by class year",
+            fn=lambda: gr.update(value="Show me the average GPA by class year"),
             inputs=None,
             outputs=question_input
         )
         example3.click(
-            fn=lambda: "How many students graduated in each program?",
+            fn=lambda: gr.update(value="How many students graduated in each program?"),
             inputs=None,
             outputs=question_input
         )
         example4.click(
-            fn=lambda: "What is the distribution of students across different terms?",
+            fn=lambda: gr.update(value="What is the distribution of students across different terms?"),
             inputs=None,
             outputs=question_input
         )
