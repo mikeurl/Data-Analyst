@@ -348,294 +348,271 @@ def main():
     print(f"OpenAI Model: gpt-4o")
     print("\nLaunching Gradio interface...")
 
-    # Beautiful, considered design - not just functional
+    # ChatGPT-style interface - clean, minimal, focused
     custom_css = """
-    /* Import elegant typography */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Spectral:wght@300;400;600&display=swap');
+    /* ChatGPT aesthetic - clean and minimal */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
-    /* Global foundation - dark, elegant gradient */
+    /* Clean light background like ChatGPT */
     .gradio-container {
-        font-family: 'Inter', -apple-system, sans-serif !important;
-        background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%) !important;
-        padding: 60px 40px !important;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+        background: #f9fafb !important;
+        padding: 0 !important;
         min-height: 100vh !important;
     }
 
-    /* Centered container - let content breathe */
-    .main-container {
-        max-width: 800px !important;
+    /* Centered column like ChatGPT */
+    .main-wrapper {
+        max-width: 768px !important;
         margin: 0 auto !important;
+        padding: 24px 16px !important;
     }
 
-    /* Logo - centered, elegant presence */
-    .logo-section {
+    /* Clean header */
+    .header-section {
         text-align: center !important;
+        padding: 32px 0 24px 0 !important;
+        border-bottom: 1px solid #e5e7eb !important;
         margin-bottom: 32px !important;
     }
 
-    .logo-section img {
-        max-width: 160px !important;
+    .header-section img {
+        max-width: 48px !important;
         height: auto !important;
-        filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4)) !important;
-        opacity: 0.95 !important;
+        margin: 0 auto 16px auto !important;
+        opacity: 0.9 !important;
     }
 
-    /* Title - invitation not instruction */
-    .title-section {
-        text-align: center !important;
-        margin-bottom: 48px !important;
-    }
-
-    .title-section h1 {
-        font-family: 'Spectral', serif !important;
-        font-size: 2.5rem !important;
-        font-weight: 300 !important;
-        color: rgba(255, 255, 255, 0.95) !important;
-        margin: 0 0 12px 0 !important;
-        letter-spacing: 0.5px !important;
-        line-height: 1.3 !important;
-    }
-
-    .title-section h2 {
-        font-size: 1.125rem !important;
-        font-weight: 400 !important;
-        color: rgba(255, 255, 255, 0.6) !important;
-        margin: 0 0 8px 0 !important;
-        letter-spacing: 0.3px !important;
-    }
-
-    .title-section p {
-        font-size: 0.95rem !important;
-        color: rgba(255, 255, 255, 0.5) !important;
+    .header-section h1 {
+        font-size: 1.25rem !important;
+        font-weight: 600 !important;
+        color: #111827 !important;
         margin: 0 !important;
-        line-height: 1.6 !important;
     }
 
-    /* Question input - THE hero element */
+    .header-section p {
+        font-size: 0.875rem !important;
+        color: #6b7280 !important;
+        margin: 8px 0 0 0 !important;
+    }
+
+    /* ChatGPT-style input box */
+    #question-input {
+        margin-bottom: 24px !important;
+    }
+
     #question-input label {
-        font-weight: 500 !important;
-        font-size: 1rem !important;
-        color: rgba(255, 255, 255, 0.9) !important;
-        margin-bottom: 12px !important;
-        letter-spacing: 0.3px !important;
+        display: none !important;
     }
 
     #question-input textarea {
-        background: rgba(255, 255, 255, 0.06) !important;
-        border: 1px solid rgba(255, 255, 255, 0.12) !important;
-        border-radius: 16px !important;
-        color: #ffffff !important;
-        font-size: 1.0625rem !important;
-        line-height: 1.6 !important;
-        padding: 24px !important;
-        min-height: 180px !important;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12) !important;
+        background: white !important;
+        border: 1px solid #d1d5db !important;
+        border-radius: 12px !important;
+        color: #111827 !important;
+        font-size: 1rem !important;
+        line-height: 1.5 !important;
+        padding: 16px !important;
+        resize: none !important;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+        transition: all 0.15s ease !important;
     }
 
     #question-input textarea::placeholder {
-        color: rgba(255, 255, 255, 0.35) !important;
-        font-size: 1rem !important;
+        color: #9ca3af !important;
     }
 
     #question-input textarea:focus {
-        background: rgba(255, 255, 255, 0.08) !important;
-        border-color: rgba(99, 102, 241, 0.4) !important;
+        background: white !important;
+        border-color: #10a37f !important;
         outline: none !important;
-        box-shadow:
-            0 0 0 3px rgba(99, 102, 241, 0.1),
-            0 8px 32px rgba(0, 0, 0, 0.16) !important;
-        transform: translateY(-1px) !important;
+        box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1) !important;
     }
 
-    /* Example suggestions - gentle, inviting */
-    .example-section {
-        text-align: center !important;
-        margin: 24px 0 !important;
+    /* Example prompts - minimal chips */
+    .examples-wrapper {
+        margin-bottom: 24px !important;
     }
 
-    .example-label {
-        font-size: 0.875rem !important;
-        color: rgba(255, 255, 255, 0.5) !important;
-        margin-bottom: 12px !important;
+    .examples-label {
+        font-size: 0.75rem !important;
         font-weight: 500 !important;
-        letter-spacing: 0.5px !important;
+        color: #6b7280 !important;
         text-transform: uppercase !important;
+        letter-spacing: 0.05em !important;
+        margin-bottom: 12px !important;
     }
 
     .example-chips {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 10px !important;
-        justify-content: center !important;
+        display: grid !important;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
+        gap: 8px !important;
     }
 
     .example-chip {
-        background: rgba(99, 102, 241, 0.12) !important;
-        border: 1px solid rgba(99, 102, 241, 0.2) !important;
-        border-radius: 24px !important;
-        padding: 10px 20px !important;
-        font-size: 0.9375rem !important;
-        color: rgba(255, 255, 255, 0.75) !important;
+        background: white !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 8px !important;
+        padding: 12px 16px !important;
+        font-size: 0.875rem !important;
+        color: #374151 !important;
         cursor: pointer !important;
-        transition: all 0.2s ease !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        gap: 6px !important;
+        transition: all 0.15s ease !important;
+        text-align: left !important;
+        display: block !important;
     }
 
     .example-chip:hover {
-        background: rgba(99, 102, 241, 0.2) !important;
-        border-color: rgba(99, 102, 241, 0.4) !important;
-        color: rgba(255, 255, 255, 0.95) !important;
-        transform: translateY(-1px) !important;
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15) !important;
+        background: #f9fafb !important;
+        border-color: #10a37f !important;
+        color: #111827 !important;
     }
 
-    /* API key - tucked away gracefully */
-    .api-section {
-        margin: 40px 0 24px 0 !important;
-        padding: 20px !important;
-        background: rgba(255, 255, 255, 0.02) !important;
-        border: 1px solid rgba(255, 255, 255, 0.06) !important;
-        border-radius: 12px !important;
+    /* ChatGPT green button */
+    button[variant="primary"] {
+        background: #10a37f !important;
+        color: white !important;
+        font-weight: 500 !important;
+        font-size: 0.875rem !important;
+        padding: 12px 24px !important;
+        border-radius: 8px !important;
+        border: none !important;
+        cursor: pointer !important;
+        transition: all 0.15s ease !important;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+        width: 100% !important;
+        margin-bottom: 16px !important;
+    }
+
+    button[variant="primary"]:hover {
+        background: #0d8f6f !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    button[variant="primary"]:active {
+        background: #0b7a5f !important;
+    }
+
+    /* API key section - minimal */
+    .api-wrapper {
+        background: #f3f4f6 !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 8px !important;
+        padding: 16px !important;
+        margin-bottom: 24px !important;
     }
 
     #api-key-input label {
-        font-size: 0.875rem !important;
-        color: rgba(255, 255, 255, 0.6) !important;
+        font-size: 0.75rem !important;
         font-weight: 500 !important;
+        color: #6b7280 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.05em !important;
         margin-bottom: 8px !important;
     }
 
     #api-key-input input {
-        background: rgba(255, 255, 255, 0.04) !important;
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        border-radius: 8px !important;
-        color: rgba(255, 255, 255, 0.9) !important;
-        font-size: 0.9375rem !important;
-        padding: 12px 16px !important;
-        transition: all 0.2s ease !important;
+        background: white !important;
+        border: 1px solid #d1d5db !important;
+        border-radius: 6px !important;
+        color: #111827 !important;
+        font-size: 0.875rem !important;
+        padding: 10px 12px !important;
+        font-family: 'SF Mono', Monaco, monospace !important;
     }
 
     #api-key-input input:focus {
-        background: rgba(255, 255, 255, 0.06) !important;
-        border-color: rgba(99, 102, 241, 0.3) !important;
+        border-color: #10a37f !important;
         outline: none !important;
-        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.08) !important;
+        box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1) !important;
     }
 
     .api-info {
-        font-size: 0.8125rem !important;
-        color: rgba(255, 255, 255, 0.45) !important;
+        font-size: 0.75rem !important;
+        color: #6b7280 !important;
         margin-top: 8px !important;
         line-height: 1.5 !important;
     }
 
     .api-info a {
-        color: rgba(99, 102, 241, 0.8) !important;
+        color: #10a37f !important;
         text-decoration: none !important;
-        border-bottom: 1px solid rgba(99, 102, 241, 0.3) !important;
-        transition: all 0.2s ease !important;
+        font-weight: 500 !important;
     }
 
     .api-info a:hover {
-        color: rgba(99, 102, 241, 1) !important;
-        border-bottom-color: rgba(99, 102, 241, 0.6) !important;
+        text-decoration: underline !important;
     }
 
-    /* Submit button - confident, clear */
-    button[variant="primary"] {
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
-        color: white !important;
-        font-weight: 600 !important;
-        font-size: 1.0625rem !important;
-        padding: 16px 48px !important;
-        border-radius: 12px !important;
-        border: none !important;
-        cursor: pointer !important;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        box-shadow: 0 4px 16px rgba(99, 102, 241, 0.25) !important;
-        letter-spacing: 0.3px !important;
-        margin: 32px 0 !important;
-        width: 100% !important;
-    }
-
-    button[variant="primary"]:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35) !important;
-        background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%) !important;
-    }
-
-    button[variant="primary"]:active {
-        transform: translateY(0) !important;
-    }
-
-    /* Results - elegant reveal */
+    /* Results section - clean */
     #output-results {
-        margin-top: 48px !important;
+        margin-top: 32px !important;
     }
 
     #output-results label {
+        font-size: 0.875rem !important;
         font-weight: 600 !important;
-        font-size: 1rem !important;
-        color: rgba(255, 255, 255, 0.9) !important;
+        color: #111827 !important;
         margin-bottom: 12px !important;
-        letter-spacing: 0.3px !important;
     }
 
     #output-results textarea {
-        background: rgba(255, 255, 255, 0.04) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        background: white !important;
+        border: 1px solid #d1d5db !important;
         border-radius: 12px !important;
-        color: rgba(226, 232, 240, 0.95) !important;
-        font-family: 'SF Mono', 'Monaco', 'Courier New', monospace !important;
-        font-size: 0.9375rem !important;
+        color: #111827 !important;
+        font-family: 'SF Mono', Monaco, 'Courier New', monospace !important;
+        font-size: 0.875rem !important;
         line-height: 1.7 !important;
-        padding: 24px !important;
+        padding: 16px !important;
         min-height: 400px !important;
-        box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
     }
 
-    /* About section - integrated naturally */
+    /* About section - minimal accordion */
     details {
-        background: rgba(255, 255, 255, 0.03) !important;
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        border-radius: 12px !important;
-        padding: 20px 24px !important;
-        margin-top: 48px !important;
+        background: white !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 8px !important;
+        padding: 16px !important;
+        margin-top: 32px !important;
     }
 
     summary {
         font-weight: 500 !important;
-        font-size: 0.9375rem !important;
-        color: rgba(255, 255, 255, 0.7) !important;
+        font-size: 0.875rem !important;
+        color: #374151 !important;
         cursor: pointer !important;
-        letter-spacing: 0.3px !important;
-        transition: color 0.2s ease !important;
+        list-style: none !important;
+    }
+
+    summary::-webkit-details-marker {
+        display: none !important;
     }
 
     summary:hover {
-        color: rgba(99, 102, 241, 0.9) !important;
+        color: #111827 !important;
     }
 
     details[open] summary {
         margin-bottom: 16px !important;
-        padding-bottom: 16px !important;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+        padding-bottom: 12px !important;
+        border-bottom: 1px solid #f3f4f6 !important;
     }
 
     details p, details li {
-        color: rgba(255, 255, 255, 0.65) !important;
-        line-height: 1.7 !important;
-        font-size: 0.9375rem !important;
+        color: #4b5563 !important;
+        line-height: 1.6 !important;
+        font-size: 0.875rem !important;
     }
 
     details h3 {
-        color: rgba(255, 255, 255, 0.85) !important;
-        font-size: 1.0625rem !important;
+        color: #111827 !important;
+        font-size: 0.875rem !important;
         font-weight: 600 !important;
-        margin: 24px 0 12px 0 !important;
+        margin: 16px 0 8px 0 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.025em !important;
     }
 
     details h3:first-of-type {
@@ -643,53 +620,42 @@ def main():
     }
 
     details a {
-        color: rgba(99, 102, 241, 0.9) !important;
+        color: #10a37f !important;
         text-decoration: none !important;
-        border-bottom: 1px solid rgba(99, 102, 241, 0.3) !important;
-        transition: all 0.2s ease !important;
+        font-weight: 500 !important;
     }
 
     details a:hover {
-        color: rgba(99, 102, 241, 1) !important;
-        border-bottom-color: rgba(99, 102, 241, 0.6) !important;
+        text-decoration: underline !important;
     }
 
-    /* Smooth animations for everything */
-    * {
-        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
-    }
-
-    /* Custom scrollbar - refined */
+    /* Clean scrollbar */
     ::-webkit-scrollbar {
         width: 8px !important;
+        height: 8px !important;
     }
 
     ::-webkit-scrollbar-track {
-        background: rgba(0, 0, 0, 0.2) !important;
+        background: transparent !important;
     }
 
     ::-webkit-scrollbar-thumb {
-        background: rgba(99, 102, 241, 0.3) !important;
+        background: #d1d5db !important;
         border-radius: 4px !important;
     }
 
     ::-webkit-scrollbar-thumb:hover {
-        background: rgba(99, 102, 241, 0.5) !important;
+        background: #9ca3af !important;
     }
 
-    /* Responsive refinements */
-    @media (max-width: 768px) {
-        .gradio-container {
-            padding: 40px 20px !important;
+    /* Responsive */
+    @media (max-width: 640px) {
+        .main-wrapper {
+            padding: 16px 12px !important;
         }
 
-        #question-input textarea {
-            font-size: 1rem !important;
-            padding: 20px !important;
-        }
-
-        button[variant="primary"] {
-            padding: 14px 32px !important;
+        .example-chips {
+            grid-template-columns: 1fr !important;
         }
     }
     """
@@ -704,69 +670,61 @@ def main():
         body_background_fill_dark="*neutral_950",
     )
 
-    # Build beautiful, centered interface
+    # Build clean ChatGPT-style interface
     with gr.Blocks(theme=theme, css=custom_css, title="Higher Education AI Analyst") as demo:
 
-        # Logo - centered, elegant
+        # Clean header with logo and title
         gr.HTML("""
-            <div class="logo-section">
+            <div class="header-section">
                 <img src="https://raw.githubusercontent.com/mikeurl/Data-Analyst/claude/review-repo-structure-011CUqm6vjgy43VX5NmComtm/docs/logo.png"
                      alt="Singulier Oblige">
-            </div>
-        """)
-
-        # Title - invitation, not instruction
-        gr.HTML("""
-            <div class="title-section">
                 <h1>Higher Education AI Analyst</h1>
-                <h2>by Singulier Oblige</h2>
-                <p>Ask your questions in plain language. Receive insights backed by data.</p>
+                <p>by Singulier Oblige</p>
             </div>
         """)
 
-        # Question input - THE hero
+        # Question input
         question_input = gr.Textbox(
-            lines=7,
-            label="What would you like to know?",
-            placeholder="Try asking: 'What are the retention rates by race and ethnicity?' or 'Show me average GPA trends by class year...'",
+            lines=4,
+            label="",
+            placeholder="Ask a question about the data...",
             elem_id="question-input"
         )
 
-        # Example suggestions - gentle invitations
+        # Example prompts
         gr.HTML("""
-            <div class="example-section">
-                <div class="example-label">Try these examples</div>
+            <div class="examples-wrapper">
+                <div class="examples-label">Examples</div>
                 <div class="example-chips">
-                    <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='What are the retention rates by race and ethnicity?'">📊 Retention by Demographics</span>
-                    <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='Show me the average GPA by class year'">📈 GPA Trends</span>
-                    <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='How many students graduated in each program?'">🎓 Graduation Stats</span>
-                    <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='What is the distribution of students across different terms?'">📅 Enrollment Distribution</span>
+                    <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='What are the retention rates by race and ethnicity?'">Retention by Demographics</span>
+                    <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='Show me the average GPA by class year'">GPA Trends</span>
+                    <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='How many students graduated in each program?'">Graduation Statistics</span>
+                    <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='What is the distribution of students across different terms?'">Enrollment Distribution</span>
                 </div>
             </div>
         """)
 
-        # Submit button - confident
+        # Submit button
         submit_btn = gr.Button(
-            "✨ Analyze",
-            variant="primary",
-            size="lg"
+            "Send",
+            variant="primary"
         )
 
-        # API key - tucked away gracefully
-        gr.HTML('<div class="api-section">')
+        # API key section
+        gr.HTML('<div class="api-wrapper">')
         api_key_input = gr.Textbox(
             lines=1,
-            label="OpenAI API Key",
+            label="OpenAI API Key (Optional)",
             placeholder="sk-proj-...",
             type="password",
             elem_id="api-key-input"
         )
-        gr.HTML('<p class="api-info">Optional if set via environment variable. <a href="https://platform.openai.com/api-keys" target="_blank">Get your key here</a></p>')
+        gr.HTML('<p class="api-info">Optional if set via environment variable. <a href="https://platform.openai.com/api-keys" target="_blank">Get your key</a></p>')
         gr.HTML('</div>')
 
-        # Results - elegant reveal
+        # Results
         output = gr.Textbox(
-            label="Analysis",
+            label="Results",
             lines=20,
             max_lines=50,
             show_copy_button=True,
@@ -774,7 +732,7 @@ def main():
         )
 
         # About section
-        with gr.Accordion("ℹ️ About This Tool", open=False):
+        with gr.Accordion("About This Tool", open=False):
             gr.Markdown("""
 ### How It Works
 
