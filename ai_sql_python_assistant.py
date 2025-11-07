@@ -348,194 +348,321 @@ def main():
     print(f"OpenAI Model: gpt-4o")
     print("\nLaunching Gradio interface...")
 
-    # Custom CSS for modern, elegant design matching the logo
+    # Modern premium AI interface CSS
     custom_css = """
-    /* Import elegant fonts */
-    @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@300;400;600&family=Inter:wght@300;400;500;600&display=swap');
+    /* Import modern fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-    /* Global styles */
+    /* Global background gradient */
     .gradio-container {
         font-family: 'Inter', sans-serif !important;
-        background: linear-gradient(135deg, #0f1419 0%, #1a1f2e 100%) !important;
+        background: linear-gradient(135deg, #1a1f2e 0%, #2d3748 100%) !important;
+        padding: 40px !important;
     }
 
-    .tagline {
-        font-family: 'Crimson Pro', serif !important;
-        font-size: 1.5rem !important;
-        font-weight: 300 !important;
-        color: #f5f3ed !important;
-        text-align: center !important;
-        margin: 1.5rem 0 0.5rem 0 !important;
+    /* Header row styling */
+    #header-row {
+        margin-bottom: 40px !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    /* Logo container (left 20%) */
+    #logo-container {
+        width: 20% !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    #logo-container img {
+        max-width: 180px !important;
+        height: auto !important;
+        filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3)) !important;
+    }
+
+    /* Title box (right 80%) - glassmorphism */
+    .title-box {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%) !important;
+        backdrop-filter: blur(10px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        border-radius: 16px !important;
+        padding: 24px 32px !important;
+        text-align: right !important;
+        width: 80% !important;
+        margin-left: auto !important;
+    }
+
+    .title-box h1 {
+        font-size: 2rem !important;
+        font-weight: 600 !important;
+        color: #ffffff !important;
+        margin: 0 !important;
         letter-spacing: 0.5px !important;
     }
 
-    .subtitle {
-        font-family: 'Inter', sans-serif !important;
+    .title-box h2 {
+        font-size: 1.25rem !important;
+        font-weight: 400 !important;
+        color: rgba(255, 255, 255, 0.9) !important;
+        margin: 0.5rem 0 0 0 !important;
+        opacity: 0.9 !important;
+    }
+
+    .title-box p {
         font-size: 0.95rem !important;
-        color: #b8b5a8 !important;
-        text-align: center !important;
-        margin: 0 0 2rem 0 !important;
-        font-weight: 300 !important;
+        color: rgba(255, 255, 255, 0.7) !important;
+        margin: 0.75rem 0 0 0 !important;
     }
 
     /* Main container */
-    .main-container {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 2rem;
+    .main-content {
+        max-width: 1200px !important;
+        margin: 0 auto !important;
     }
 
-    /* Input section card */
-    .input-card {
-        background: rgba(255, 255, 255, 0.03) !important;
-        border: 1px solid rgba(245, 243, 237, 0.1) !important;
-        border-radius: 16px !important;
-        padding: 2rem !important;
-        backdrop-filter: blur(10px) !important;
+    /* Form card - hero element */
+    .form-card {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 12px !important;
+        padding: 32px !important;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+        backdrop-filter: blur(10px) !important;
+        margin-bottom: 20px !important;
+    }
+
+    /* Input fields with subtle borders */
+    .form-card input,
+    .form-card textarea {
+        background: rgba(0, 0, 0, 0.3) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 8px !important;
+        color: #ffffff !important;
+        font-family: 'Inter', sans-serif !important;
+        padding: 12px 16px !important;
+        transition: all 0.3s ease !important;
+    }
+
+    .form-card input::placeholder,
+    .form-card textarea::placeholder {
+        opacity: 0.5 !important;
+        color: rgba(255, 255, 255, 0.5) !important;
+    }
+
+    .form-card input:focus,
+    .form-card textarea:focus {
+        outline: 2px solid #60a5fa !important;
+        outline-offset: 2px !important;
+        border-color: transparent !important;
+        box-shadow: none !important;
+    }
+
+    /* Question textarea - not dominating */
+    #question-input textarea {
+        min-height: 150px !important;
+        max-height: 200px !important;
     }
 
     /* Labels */
-    label {
-        font-family: 'Inter', sans-serif !important;
+    .form-card label {
         font-weight: 500 !important;
-        color: #f5f3ed !important;
-        font-size: 0.9rem !important;
-        letter-spacing: 0.3px !important;
-        margin-bottom: 0.5rem !important;
+        color: rgba(255, 255, 255, 0.9) !important;
+        font-size: 0.875rem !important;
+        margin-bottom: 8px !important;
+        display: block !important;
     }
 
-    /* Input fields */
-    input, textarea {
-        background: rgba(26, 31, 46, 0.8) !important;
-        border: 1px solid rgba(245, 243, 237, 0.15) !important;
-        border-radius: 8px !important;
-        color: #f5f3ed !important;
-        font-family: 'Inter', sans-serif !important;
-        padding: 0.75rem !important;
-        transition: all 0.3s ease !important;
-    }
-
-    input:focus, textarea:focus {
-        border-color: rgba(212, 175, 106, 0.5) !important;
-        box-shadow: 0 0 0 3px rgba(212, 175, 106, 0.1) !important;
-        outline: none !important;
-    }
-
-    /* Buttons */
-    .primary-button {
-        background: linear-gradient(135deg, #d4af6a 0%, #b89656 100%) !important;
+    /* Submit button with gradient */
+    .submit-button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
         border: none !important;
         border-radius: 8px !important;
-        color: #1a1f2e !important;
+        color: #ffffff !important;
         font-weight: 600 !important;
-        font-family: 'Inter', sans-serif !important;
-        padding: 0.875rem 2rem !important;
+        padding: 12px 32px !important;
         font-size: 1rem !important;
-        letter-spacing: 0.5px !important;
+        cursor: pointer !important;
         transition: all 0.3s ease !important;
-        box-shadow: 0 4px 12px rgba(212, 175, 106, 0.3) !important;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3) !important;
+        margin-top: 16px !important;
+        width: 100% !important;
     }
 
-    .primary-button:hover {
+    .submit-button:hover {
         transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px rgba(212, 175, 106, 0.4) !important;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4) !important;
+    }
+
+    /* API key section - less prominent */
+    #api-key-section {
+        margin-top: 20px !important;
+        padding-top: 20px !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+    }
+
+    #api-key-section label {
+        font-size: 0.8rem !important;
+        color: rgba(255, 255, 255, 0.6) !important;
+    }
+
+    .api-info {
+        font-size: 0.75rem !important;
+        color: rgba(255, 255, 255, 0.5) !important;
+        margin-top: 4px !important;
+    }
+
+    .api-info a {
+        color: #60a5fa !important;
+        text-decoration: none !important;
+    }
+
+    .api-info a:hover {
+        text-decoration: underline !important;
+    }
+
+    /* Example chips */
+    .example-chips {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 12px !important;
+        margin-top: 20px !important;
+    }
+
+    .example-chip {
+        background: rgba(102, 126, 234, 0.15) !important;
+        border: 1px solid rgba(102, 126, 234, 0.3) !important;
+        border-radius: 20px !important;
+        padding: 8px 16px !important;
+        font-size: 0.85rem !important;
+        color: rgba(255, 255, 255, 0.8) !important;
+        cursor: pointer !important;
+        transition: all 0.3s ease !important;
+        display: inline-block !important;
+    }
+
+    .example-chip:hover {
+        background: rgba(102, 126, 234, 0.25) !important;
+        border-color: rgba(102, 126, 234, 0.5) !important;
+        color: #ffffff !important;
+        transform: translateY(-1px) !important;
     }
 
     /* Output area */
-    .output-container {
-        background: rgba(26, 31, 46, 0.6) !important;
-        border: 1px solid rgba(245, 243, 237, 0.1) !important;
+    .output-section {
+        background: rgba(0, 0, 0, 0.3) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
         border-radius: 12px !important;
-        padding: 1.5rem !important;
-        margin-top: 1.5rem !important;
-        font-family: 'Monaco', 'Courier New', monospace !important;
-        color: #f5f3ed !important;
+        padding: 24px !important;
+        margin-top: 20px !important;
         backdrop-filter: blur(10px) !important;
     }
 
-    /* Examples section */
-    .examples-container {
-        margin-top: 2rem !important;
+    .output-section label {
+        font-weight: 600 !important;
+        color: rgba(255, 255, 255, 0.9) !important;
+        font-size: 1rem !important;
+        margin-bottom: 12px !important;
     }
 
-    .example-item {
-        background: rgba(255, 255, 255, 0.02) !important;
-        border: 1px solid rgba(245, 243, 237, 0.08) !important;
-        border-radius: 8px !important;
-        padding: 0.75rem 1rem !important;
-        color: #b8b5a8 !important;
-        transition: all 0.3s ease !important;
-        cursor: pointer !important;
+    .output-section textarea {
+        background: rgba(0, 0, 0, 0.5) !important;
+        border: none !important;
+        color: #ffffff !important;
+        font-family: 'Monaco', 'Courier New', monospace !important;
+        font-size: 0.875rem !important;
+        line-height: 1.6 !important;
     }
 
-    .example-item:hover {
-        background: rgba(212, 175, 106, 0.1) !important;
-        border-color: rgba(212, 175, 106, 0.3) !important;
-        color: #f5f3ed !important;
-    }
-
-    /* Accordion */
-    .accordion {
-        background: rgba(255, 255, 255, 0.02) !important;
-        border: 1px solid rgba(245, 243, 237, 0.08) !important;
+    /* Accordion styling */
+    details {
+        background: rgba(255, 255, 255, 0.03) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
         border-radius: 12px !important;
-        margin-top: 2rem !important;
+        padding: 16px !important;
+        margin-top: 20px !important;
     }
 
-    .accordion summary {
-        font-family: 'Inter', sans-serif !important;
+    summary {
         font-weight: 500 !important;
-        color: #f5f3ed !important;
-        padding: 1rem 1.5rem !important;
+        color: rgba(255, 255, 255, 0.8) !important;
         cursor: pointer !important;
-        transition: all 0.3s ease !important;
+        font-size: 0.95rem !important;
     }
 
-    .accordion summary:hover {
-        color: #d4af6a !important;
+    summary:hover {
+        color: #60a5fa !important;
     }
 
-    .accordion-content {
-        color: #b8b5a8 !important;
-        padding: 0 1.5rem 1.5rem 1.5rem !important;
-        line-height: 1.7 !important;
+    details p, details ul, details li {
+        color: rgba(255, 255, 255, 0.7) !important;
+        line-height: 1.6 !important;
     }
 
     /* Links */
     a {
-        color: #d4af6a !important;
+        color: #60a5fa !important;
         text-decoration: none !important;
-        transition: all 0.3s ease !important;
     }
 
     a:hover {
-        color: #e5c07a !important;
         text-decoration: underline !important;
     }
 
-    /* Headings in markdown */
-    h1, h2, h3, h4, h5, h6 {
-        font-family: 'Crimson Pro', serif !important;
-        color: #f5f3ed !important;
+    /* Loading spinner */
+    .loading {
+        opacity: 0.6 !important;
+        pointer-events: none !important;
     }
 
     /* Scrollbar */
     ::-webkit-scrollbar {
-        width: 10px;
+        width: 10px !important;
     }
 
     ::-webkit-scrollbar-track {
-        background: rgba(26, 31, 46, 0.3);
+        background: rgba(0, 0, 0, 0.2) !important;
     }
 
     ::-webkit-scrollbar-thumb {
-        background: rgba(212, 175, 106, 0.3);
-        border-radius: 5px;
+        background: rgba(102, 126, 234, 0.3) !important;
+        border-radius: 5px !important;
     }
 
     ::-webkit-scrollbar-thumb:hover {
-        background: rgba(212, 175, 106, 0.5);
+        background: rgba(102, 126, 234, 0.5) !important;
+    }
+
+    /* Spacing utilities */
+    .section-spacing {
+        margin-bottom: 20px !important;
+    }
+
+    /* Override Gradio button defaults */
+    button[variant="primary"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        border: none !important;
+        border-radius: 8px !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        padding: 12px 32px !important;
+        font-size: 1rem !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3) !important;
+        margin-top: 16px !important;
+    }
+
+    button[variant="primary"]:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4) !important;
+    }
+
+    /* Improve form card spacing */
+    .form-card > * {
+        margin-bottom: 16px !important;
+    }
+
+    .form-card > *:last-child {
+        margin-bottom: 0 !important;
     }
     """
 
@@ -549,88 +676,93 @@ def main():
         body_background_fill_dark="*neutral_950",
     )
 
-    # Build interface using Blocks for complete control
+    # Build modern premium AI interface
     with gr.Blocks(theme=theme, css=custom_css, title="Higher Education AI Analyst") as demo:
-        # Logo and header - centered
+
+        # HEADER: Logo (left 20%) + Title Box (right 80%)
+        with gr.Row(elem_id="header-row"):
+            # Logo container
+            with gr.Column(scale=2):
+                gr.HTML("""
+                    <div id="logo-container">
+                        <img src="https://raw.githubusercontent.com/mikeurl/Data-Analyst/claude/review-repo-structure-011CUqm6vjgy43VX5NmComtm/docs/logo.png"
+                             alt="Singulier Oblige">
+                    </div>
+                """)
+
+            # Title box with glassmorphism
+            with gr.Column(scale=8):
+                gr.HTML("""
+                    <div class="title-box">
+                        <h1>Singulier Oblige</h1>
+                        <h2>Higher Education AI Analyst</h2>
+                        <p>Transform your questions into insights. Ask in plain language, receive intelligent analysis.</p>
+                    </div>
+                """)
+
+        # MAIN CONTENT
+        gr.HTML('<div class="main-content">')
+
+        # FORM CARD - Hero Element
+        gr.HTML('<div class="form-card">')
+
+        # Question input
+        question_input = gr.Textbox(
+            lines=6,
+            label="Ask Your Question",
+            placeholder="e.g., 'Show me retention rates by race/ethnicity' or 'What's the average GPA by class year?'",
+            elem_id="question-input"
+        )
+
+        # Example query chips
         gr.HTML("""
-            <div style="text-align: center; padding: 2rem 0 1rem 0;">
-                <img src="https://raw.githubusercontent.com/mikeurl/Data-Analyst/claude/review-repo-structure-011CUqm6vjgy43VX5NmComtm/docs/logo.png"
-                     alt="Singulier Oblige"
-                     style="max-width: 200px; height: auto; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));">
+            <div class="example-chips">
+                <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='What are the retention rates by race and ethnicity?'">📊 Retention by Demographics</span>
+                <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='Show me the average GPA by class year'">📈 GPA Trends</span>
+                <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='How many students graduated in each program?'">🎓 Graduation Stats</span>
+                <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='What is the distribution of students across different terms?'">📅 Enrollment Distribution</span>
             </div>
         """)
 
-        gr.Markdown(
-            "<div class='tagline'>Higher Education AI Analyst</div>"
+        # API Key section - less prominent
+        gr.HTML('<div id="api-key-section">')
+        api_key_input = gr.Textbox(
+            lines=1,
+            label="OpenAI API Key (Optional)",
+            placeholder="sk-proj-...",
+            type="password"
+        )
+        gr.HTML('<p class="api-info">Leave blank if set via environment variable. Get your API key at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a></p>')
+        gr.HTML('</div>')  # Close api-key-section
+
+        # Submit button
+        submit_btn = gr.Button(
+            "🔍 Analyze Data",
+            variant="primary",
+            size="lg"
         )
 
-        gr.Markdown(
-            "<div class='subtitle'>Transform your questions into insights. Ask in plain language, receive intelligent analysis.</div>"
+        gr.HTML('</div>')  # Close form-card
+
+        # Output section
+        gr.HTML('<div class="output-section section-spacing">')
+        output = gr.Textbox(
+            label="📄 Analysis Results",
+            lines=20,
+            max_lines=50,
+            show_copy_button=True
         )
+        gr.HTML('</div>')  # Close output-section
 
-        gr.Markdown(
-            "<div style='text-align: center; color: #b8b5a8; font-size: 0.85rem; margin-bottom: 2rem;'>Get your API key from <a href='https://platform.openai.com/api-keys' target='_blank'>platform.openai.com/api-keys</a></div>"
-        )
-
-        # Main input area
-        with gr.Row():
-            with gr.Column(scale=1):
-                question_input = gr.Textbox(
-                    lines=4,
-                    label="Your Question",
-                    placeholder="e.g., 'Show me retention rates by race/ethnicity' or 'What's the average GPA by class year?'"
-                )
-
-                api_key_input = gr.Textbox(
-                    lines=1,
-                    label="OpenAI API Key",
-                    placeholder="sk-proj-...",
-                    type="password",
-                    info="Optional if set via environment variable"
-                )
-
-                submit_btn = gr.Button(
-                    "Analyze Data",
-                    variant="primary",
-                    size="lg"
-                )
-
-        # Output area
-        with gr.Row():
-            output = gr.Textbox(
-                label="Analysis Results",
-                lines=20,
-                max_lines=50,
-                show_copy_button=True
-            )
-
-        # Examples section
-        gr.Markdown("<div style='margin-top: 2rem; margin-bottom: 1rem;'><h3 style='color: #f5f3ed; font-family: Crimson Pro, serif; font-weight: 400; font-size: 1.2rem;'>Example Questions</h3></div>")
-
-        gr.Examples(
-            examples=[
-                ["What are the retention rates by race and ethnicity?", ""],
-                ["Show me the average GPA by class year", ""],
-                ["How many students graduated in each program?", ""],
-                ["What's the distribution of students across different terms?", ""]
-            ],
-            inputs=[question_input, api_key_input],
-            outputs=output,
-            fn=ai_assistant,
-            cache_examples=False
-        )
-
-        # About section with elegant styling
-        with gr.Accordion("About This Tool", open=False):
+        # About section
+        with gr.Accordion("ℹ️ About This Tool", open=False):
             gr.Markdown("""
-<div class='accordion-content'>
-
 ### How It Works
 
 This tool employs a sophisticated three-step AI process:
 
-1. **SQL Generation** — Translates your natural language question into a precise SQL query based on the database schema
-2. **Local Execution** — Executes the query against your SQLite database
+1. **SQL Generation** — Translates your natural language question into a precise SQL query
+2. **Local Execution** — Executes the query against the SQLite database
 3. **Python Analysis** — Generates and runs Python code for deeper statistical analysis
 4. **Intelligent Explanation** — Synthesizes results into clear, actionable insights
 
@@ -638,8 +770,8 @@ This tool employs a sophisticated three-step AI process:
 
 ### Privacy & Data Handling
 
-- All SQL execution and data analysis occurs **locally on your server**
-- Only database schema and minimal data previews (5 rows) are transmitted to OpenAI's API
+- All SQL execution and data analysis occurs **on the server**
+- Only database schema and minimal data previews (5 rows) are sent to OpenAI's API
 - This deployment uses **100% synthetic data** — no real student information
 - Your API key is used only for your requests and is never stored
 
@@ -659,10 +791,10 @@ Do not deploy with real student data without implementing:
 
 ### Technical Details
 
-**Source Code:** [github.com/mikeurl/Data-Analyst](https://github.com/mikeurl/Data-Analyst)
-**Model:** OpenAI GPT-4o
-**Database:** SQLite with IPEDS-like schema
-**Framework:** Gradio + Python
+- **Source Code:** [github.com/mikeurl/Data-Analyst](https://github.com/mikeurl/Data-Analyst)
+- **AI Model:** OpenAI GPT-4o
+- **Database:** SQLite with IPEDS-like schema
+- **Framework:** Gradio + Python
 
 ---
 
@@ -671,9 +803,9 @@ Do not deploy with real student data without implementing:
 *No Ball State University student data or institutional resources were used in this project.*
 
 **Singulier Oblige** — Excellence in educational analytics
-
-</div>
             """)
+
+        gr.HTML('</div>')  # Close main-content
 
         # Connect the button
         submit_btn.click(
