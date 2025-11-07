@@ -414,12 +414,6 @@ def main():
         margin: 0.75rem 0 0 0 !important;
     }
 
-    /* Main container */
-    .main-content {
-        max-width: 1200px !important;
-        margin: 0 auto !important;
-    }
-
     /* Form card - hero element */
     .form-card {
         background: rgba(255, 255, 255, 0.05) !important;
@@ -431,11 +425,11 @@ def main():
         margin-bottom: 20px !important;
     }
 
-    /* Input fields with subtle borders */
+    /* Input fields with subtle borders - FIXED COLORS */
     .form-card input,
     .form-card textarea {
-        background: rgba(0, 0, 0, 0.3) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        background: rgba(30, 41, 59, 0.8) !important;
+        border: 1px solid rgba(100, 116, 139, 0.3) !important;
         border-radius: 8px !important;
         color: #ffffff !important;
         font-family: 'Inter', sans-serif !important;
@@ -547,10 +541,10 @@ def main():
         transform: translateY(-1px) !important;
     }
 
-    /* Output area */
+    /* Output area - FIXED BACKGROUND */
     .output-section {
-        background: rgba(0, 0, 0, 0.3) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        background: rgba(30, 41, 59, 0.6) !important;
+        border: 1px solid rgba(100, 116, 139, 0.3) !important;
         border-radius: 12px !important;
         padding: 24px !important;
         margin-top: 20px !important;
@@ -559,18 +553,21 @@ def main():
 
     .output-section label {
         font-weight: 600 !important;
-        color: rgba(255, 255, 255, 0.9) !important;
+        color: #ffffff !important;
         font-size: 1rem !important;
         margin-bottom: 12px !important;
+        letter-spacing: 0.3px !important;
     }
 
     .output-section textarea {
-        background: rgba(0, 0, 0, 0.5) !important;
-        border: none !important;
-        color: #ffffff !important;
+        background: rgba(15, 23, 42, 0.8) !important;
+        border: 1px solid rgba(100, 116, 139, 0.2) !important;
+        border-radius: 8px !important;
+        color: #e2e8f0 !important;
         font-family: 'Monaco', 'Courier New', monospace !important;
         font-size: 0.875rem !important;
         line-height: 1.6 !important;
+        padding: 16px !important;
     }
 
     /* Accordion styling */
@@ -637,23 +634,34 @@ def main():
         margin-bottom: 20px !important;
     }
 
-    /* Override Gradio button defaults */
-    button[variant="primary"] {
+    /* Override Gradio button defaults - PERFECT BUTTON */
+    button[variant="primary"],
+    .submit-button,
+    button.primary {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        border: none !important;
-        border-radius: 8px !important;
-        color: #ffffff !important;
+        color: white !important;
         font-weight: 600 !important;
-        padding: 12px 32px !important;
-        font-size: 1rem !important;
+        padding: 16px 48px !important;
+        border-radius: 8px !important;
+        border: none !important;
+        cursor: pointer !important;
         transition: all 0.3s ease !important;
         box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3) !important;
         margin-top: 16px !important;
+        font-size: 1rem !important;
+        letter-spacing: 0.3px !important;
     }
 
-    button[variant="primary"]:hover {
+    button[variant="primary"]:hover,
+    .submit-button:hover,
+    button.primary:hover {
         transform: translateY(-2px) !important;
-        box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4) !important;
+        box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4) !important;
+    }
+
+    button[variant="primary"]:active,
+    .submit-button:active {
+        transform: translateY(0) !important;
     }
 
     /* Improve form card spacing */
@@ -700,10 +708,7 @@ def main():
                     </div>
                 """)
 
-        # MAIN CONTENT
-        gr.HTML('<div class="main-content">')
-
-        # FORM CARD - Hero Element
+        # FORM CARD - Hero Element (no wrapper needed)
         gr.HTML('<div class="form-card">')
 
         # Question input
@@ -804,8 +809,6 @@ Do not deploy with real student data without implementing:
 
 **Singulier Oblige** — Excellence in educational analytics
             """)
-
-        gr.HTML('</div>')  # Close main-content
 
         # Connect the button
         submit_btn.click(
