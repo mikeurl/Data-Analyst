@@ -573,13 +573,11 @@ def main():
         """)
 
         gr.Markdown(
-            "<div class='tagline'>Higher Education AI Analyst</div>",
-            elem_classes=["tagline"]
+            "<div class='tagline'>Higher Education AI Analyst</div>"
         )
 
         gr.Markdown(
-            "<div class='subtitle'>Transform your questions into insights. Ask in plain language, receive intelligent analysis.</div>",
-            elem_classes=["subtitle"]
+            "<div class='subtitle'>Transform your questions into insights. Ask in plain language, receive intelligent analysis.</div>"
         )
 
         gr.Markdown(
@@ -592,8 +590,7 @@ def main():
                 question_input = gr.Textbox(
                     lines=4,
                     label="Your Question",
-                    placeholder="e.g., 'Show me retention rates by race/ethnicity' or 'What's the average GPA by class year?'",
-                    elem_classes=["input-card"]
+                    placeholder="e.g., 'Show me retention rates by race/ethnicity' or 'What's the average GPA by class year?'"
                 )
 
                 api_key_input = gr.Textbox(
@@ -601,15 +598,13 @@ def main():
                     label="OpenAI API Key",
                     placeholder="sk-proj-...",
                     type="password",
-                    info="Optional if set via environment variable",
-                    elem_classes=["input-card"]
+                    info="Optional if set via environment variable"
                 )
 
                 submit_btn = gr.Button(
                     "Analyze Data",
                     variant="primary",
-                    size="lg",
-                    elem_classes=["primary-button"]
+                    size="lg"
                 )
 
         # Output area
@@ -618,8 +613,7 @@ def main():
                 label="Analysis Results",
                 lines=20,
                 max_lines=50,
-                show_copy_button=True,
-                elem_classes=["output-container"]
+                show_copy_button=True
             )
 
         # Examples section
@@ -635,12 +629,11 @@ def main():
             inputs=[question_input, api_key_input],
             outputs=output,
             fn=ai_assistant,
-            cache_examples=False,
-            elem_classes=["examples-container"]
+            cache_examples=False
         )
 
         # About section with elegant styling
-        with gr.Accordion("About This Tool", open=False, elem_classes=["accordion"]):
+        with gr.Accordion("About This Tool", open=False):
             gr.Markdown("""
 <div class='accordion-content'>
 
@@ -692,7 +685,7 @@ Do not deploy with real student data without implementing:
 **Singulier Oblige** — Excellence in educational analytics
 
 </div>
-            """, elem_classes=["accordion-content"])
+            """)
 
         # Connect the button
         submit_btn.click(
