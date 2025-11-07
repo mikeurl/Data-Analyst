@@ -392,18 +392,17 @@ def main():
         margin: 8px 0 0 0 !important;
     }
 
-    /* ChatGPT-style input box using wrapper class */
-    .question-input-wrapper {
+    /* ChatGPT-style input box using ID */
+    #question-input {
         margin-bottom: 24px !important;
     }
 
-    .question-input-wrapper label {
+    #question-input label {
         display: none !important;
     }
 
     /* Target Gradio's actual textarea element */
-    .question-input-wrapper .gradio-textbox textarea,
-    .question-input-wrapper textarea {
+    #question-input textarea {
         background: white !important;
         border: 1px solid #d1d5db !important;
         border-radius: 12px !important;
@@ -417,13 +416,11 @@ def main():
         transition: all 0.15s ease !important;
     }
 
-    .question-input-wrapper .gradio-textbox textarea::placeholder,
-    .question-input-wrapper textarea::placeholder {
+    #question-input textarea::placeholder {
         color: #9ca3af !important;
     }
 
-    .question-input-wrapper .gradio-textbox textarea:focus,
-    .question-input-wrapper textarea:focus {
+    #question-input textarea:focus {
         border-color: #10a37f !important;
         outline: none !important;
         box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1) !important;
@@ -505,7 +502,7 @@ def main():
         margin-bottom: 24px !important;
     }
 
-    .api-key-input-wrapper label {
+    #api-key-input label {
         font-size: 0.75rem !important;
         font-weight: 500 !important;
         color: #6b7280 !important;
@@ -514,8 +511,7 @@ def main():
         margin-bottom: 8px !important;
     }
 
-    .api-key-input-wrapper input,
-    .api-key-input-wrapper .gradio-textbox input {
+    #api-key-input input {
         background: white !important;
         border: 1px solid #d1d5db !important;
         border-radius: 6px !important;
@@ -525,8 +521,7 @@ def main():
         font-family: 'SF Mono', Monaco, monospace !important;
     }
 
-    .api-key-input-wrapper input:focus,
-    .api-key-input-wrapper .gradio-textbox input:focus {
+    #api-key-input input:focus {
         border-color: #10a37f !important;
         outline: none !important;
         box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1) !important;
@@ -691,10 +686,11 @@ def main():
         # Question input
         question_input = gr.Textbox(
             lines=4,
-            label="",
+            label="Your Question",
             placeholder="Ask a question about the data...",
-            elem_classes=["question-input-wrapper"],
-            interactive=True
+            elem_id="question-input",
+            interactive=True,
+            show_label=False
         )
 
         # Example prompts using proper Gradio buttons
@@ -721,7 +717,7 @@ def main():
             label="OpenAI API Key (Optional)",
             placeholder="sk-proj-...",
             type="password",
-            elem_classes=["api-key-input-wrapper"],
+            elem_id="api-key-input",
             interactive=True
         )
         gr.HTML('<p class="api-info">Optional if set via environment variable. <a href="https://platform.openai.com/api-keys" target="_blank">Get your key</a></p>')
@@ -803,19 +799,23 @@ Do not deploy with real student data without implementing:
 
         # Connect example buttons to populate the question input
         example1.click(
-            lambda: "What are the retention rates by race and ethnicity?",
+            fn=lambda: "What are the retention rates by race and ethnicity?",
+            inputs=None,
             outputs=question_input
         )
         example2.click(
-            lambda: "Show me the average GPA by class year",
+            fn=lambda: "Show me the average GPA by class year",
+            inputs=None,
             outputs=question_input
         )
         example3.click(
-            lambda: "How many students graduated in each program?",
+            fn=lambda: "How many students graduated in each program?",
+            inputs=None,
             outputs=question_input
         )
         example4.click(
-            lambda: "What is the distribution of students across different terms?",
+            fn=lambda: "What is the distribution of students across different terms?",
+            inputs=None,
             outputs=question_input
         )
 
