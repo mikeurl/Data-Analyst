@@ -543,23 +543,21 @@ def main():
     }
 
     /* Output results */
-    #output-results {
-        height: auto !important;
-    }
-
     #output-results textarea {
         background: rgba(15, 23, 42, 0.85) !important;
         border: 1px solid rgba(148, 163, 184, 0.18) !important;
         border-radius: 16px !important;
         padding: 18px !important;
-        min-height: 60vh !important;
-        max-height: 70vh !important;
+        height: clamp(200px, 34vh, 320px) !important;
+        min-height: 200px !important;
+        max-height: 340px !important;
         font-family: 'SF Mono', Monaco, 'Courier New', monospace !important;
         font-size: 0.9rem !important;
         line-height: 1.55 !important;
         color: #f8fafc !important;
         box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.06) !important;
         overflow-y: auto !important;
+        resize: vertical !important;
     }
 
     /* About accordion */
@@ -620,8 +618,9 @@ def main():
         }
 
         #output-results textarea {
-            min-height: 320px !important;
-            max-height: none !important;
+            height: clamp(180px, 40vh, 280px) !important;
+            min-height: 180px !important;
+            max-height: 300px !important;
         }
     }
     """
@@ -751,7 +750,7 @@ Do not deploy with real student data without implementing:
             with gr.Column(elem_classes=["right-column"], scale=2):
                 output = gr.Textbox(
                     label="Results",
-                    lines=20,
+                    lines=8,
                     show_copy_button=True,
                     elem_id="output-results",
                     interactive=False
