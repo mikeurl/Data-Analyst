@@ -344,33 +344,266 @@ def main():
     print(f"OpenAI Model: gpt-4o")
     print("\nLaunching Gradio interface...")
 
-    # Simplified safe CSS to avoid accidental overlays that can make inputs uneditable.
-    # The previous very large CSS block could unintentionally overlap elements or set
-    # layout rules that made the textarea non-interactive in some Gradio versions.
+    # Two-column layout with ChatGPT styling
     custom_css = """
-    /* Minimal safe styles */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+    /* Base styling */
     .gradio-container {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
         background: #f9fafb !important;
-        padding: 12px !important;
+        padding: 0 !important;
+        max-width: 100% !important;
     }
+
+    /* Two-column layout */
+    .two-column-container {
+        display: grid !important;
+        grid-template-columns: 450px 1fr !important;
+        gap: 0 !important;
+        min-height: 100vh !important;
+    }
+
+    /* Left column - input side */
+    .left-column {
+        background: white !important;
+        border-right: 1px solid #e5e7eb !important;
+        padding: 32px 24px !important;
+        overflow-y: auto !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }
+
+    /* Right column - output side */
+    .right-column {
+        background: #f9fafb !important;
+        padding: 32px 24px !important;
+        overflow-y: auto !important;
+    }
+
+    /* Header */
+    .header-section {
+        text-align: center !important;
+        margin-bottom: 32px !important;
+        padding-bottom: 24px !important;
+        border-bottom: 1px solid #f3f4f6 !important;
+    }
+
+    .header-section img {
+        max-width: 48px !important;
+        height: auto !important;
+        margin: 0 auto 12px auto !important;
+        opacity: 0.9 !important;
+    }
+
+    .header-section h1 {
+        font-size: 1.25rem !important;
+        font-weight: 600 !important;
+        color: #111827 !important;
+        margin: 0 0 4px 0 !important;
+    }
+
+    .header-section p {
+        font-size: 0.875rem !important;
+        color: #6b7280 !important;
+        margin: 0 !important;
+    }
+
+    /* Question input */
     #question-input textarea {
         background: white !important;
         border: 1px solid #d1d5db !important;
         border-radius: 12px !important;
         color: #111827 !important;
         font-size: 1rem !important;
-        padding: 12px !important;
-        min-height: 120px !important;
+        padding: 16px !important;
+        min-height: 140px !important;
         resize: vertical !important;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+        transition: border-color 0.15s ease !important;
     }
+
+    #question-input textarea:focus {
+        border-color: #10a37f !important;
+        outline: none !important;
+        box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1) !important;
+    }
+
+    /* Example buttons */
+    .examples-label {
+        font-size: 0.75rem !important;
+        font-weight: 500 !important;
+        color: #6b7280 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.05em !important;
+        margin: 20px 0 12px 0 !important;
+    }
+
+    .example-row {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 8px !important;
+        margin-bottom: 20px !important;
+    }
+
+    .example-button button {
+        background: #f9fafb !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 8px !important;
+        padding: 10px 14px !important;
+        font-size: 0.875rem !important;
+        color: #374151 !important;
+        cursor: pointer !important;
+        transition: all 0.15s ease !important;
+        text-align: center !important;
+        font-weight: 400 !important;
+        width: 100% !important;
+    }
+
+    .example-button button:hover {
+        background: white !important;
+        border-color: #10a37f !important;
+        color: #111827 !important;
+    }
+
+    /* Submit button */
+    button[variant="primary"] {
+        background: #10a37f !important;
+        color: white !important;
+        font-weight: 500 !important;
+        font-size: 0.875rem !important;
+        padding: 12px 24px !important;
+        border-radius: 8px !important;
+        border: none !important;
+        cursor: pointer !important;
+        transition: all 0.15s ease !important;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+        width: 100% !important;
+        margin: 20px 0 !important;
+    }
+
+    button[variant="primary"]:hover {
+        background: #0d8f6f !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    /* API key section */
+    .api-section {
+        background: #f9fafb !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 8px !important;
+        padding: 16px !important;
+        margin: 20px 0 !important;
+    }
+
+    #api-key-input input {
+        background: white !important;
+        border: 1px solid #d1d5db !important;
+        border-radius: 6px !important;
+        color: #111827 !important;
+        font-size: 0.875rem !important;
+        padding: 10px 12px !important;
+        font-family: 'SF Mono', Monaco, monospace !important;
+    }
+
+    #api-key-input input:focus {
+        border-color: #10a37f !important;
+        outline: none !important;
+        box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1) !important;
+    }
+
+    .api-info {
+        font-size: 0.75rem !important;
+        color: #6b7280 !important;
+        margin-top: 8px !important;
+    }
+
+    .api-info a {
+        color: #10a37f !important;
+        text-decoration: none !important;
+    }
+
+    .api-info a:hover {
+        text-decoration: underline !important;
+    }
+
+    /* Output results */
+    #output-results {
+        height: calc(100vh - 64px) !important;
+    }
+
     #output-results textarea {
         background: white !important;
         border: 1px solid #d1d5db !important;
+        border-radius: 12px !important;
+        padding: 16px !important;
+        min-height: calc(100vh - 120px) !important;
+        font-family: 'SF Mono', Monaco, 'Courier New', monospace !important;
+        font-size: 0.875rem !important;
+        line-height: 1.6 !important;
+        color: #111827 !important;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+    }
+
+    /* About accordion */
+    details {
+        background: #f9fafb !important;
+        border: 1px solid #e5e7eb !important;
         border-radius: 8px !important;
         padding: 12px !important;
-        min-height: 300px !important;
-        font-family: 'SF Mono', Monaco, monospace !important;
+        margin-top: auto !important;
+        margin-top: 24px !important;
+    }
+
+    summary {
+        font-weight: 500 !important;
+        font-size: 0.875rem !important;
+        color: #374151 !important;
+        cursor: pointer !important;
+    }
+
+    details[open] summary {
+        margin-bottom: 12px !important;
+        padding-bottom: 12px !important;
+        border-bottom: 1px solid #e5e7eb !important;
+    }
+
+    details p, details li {
+        color: #4b5563 !important;
+        line-height: 1.6 !important;
+        font-size: 0.875rem !important;
+    }
+
+    details h3 {
+        color: #111827 !important;
+        font-size: 0.875rem !important;
+        font-weight: 600 !important;
+        margin: 12px 0 6px 0 !important;
+    }
+
+    details a {
+        color: #10a37f !important;
+        text-decoration: none !important;
+    }
+
+    details a:hover {
+        text-decoration: underline !important;
+    }
+
+    /* Responsive - stack on small screens */
+    @media (max-width: 1024px) {
+        .two-column-container {
+            grid-template-columns: 1fr !important;
+        }
+
+        .left-column {
+            border-right: none !important;
+            border-bottom: 1px solid #e5e7eb !important;
+        }
+
+        #output-results textarea {
+            min-height: 400px !important;
+        }
     }
     """
 
@@ -384,71 +617,69 @@ def main():
         body_background_fill_dark="*neutral_950",
     )
 
-    # Build clean ChatGPT-style interface
+    # Build two-column interface
     with gr.Blocks(theme=theme, css=custom_css, title="Higher Education AI Analyst") as demo:
 
-        # Clean header with logo and title
-        gr.HTML("""
-            <div class="header-section">
-                <img src="https://raw.githubusercontent.com/mikeurl/Data-Analyst/claude/review-repo-structure-011CUqm6vjgy43VX5NmComtm/docs/logo.png"
-                     alt="Singulier Oblige">
-                <h1>Higher Education AI Analyst</h1>
-                <p>by Singulier Oblige</p>
-            </div>
-        """)
+        with gr.Row(elem_classes=["two-column-container"]):
+            # LEFT COLUMN - Input side
+            with gr.Column(elem_classes=["left-column"], scale=1):
+                # Header
+                gr.HTML("""
+                    <div class="header-section">
+                        <img src="https://raw.githubusercontent.com/mikeurl/Data-Analyst/claude/review-repo-structure-011CUqm6vjgy43VX5NmComtm/docs/logo.png"
+                             alt="Singulier Oblige">
+                        <h1>Higher Education AI Analyst</h1>
+                        <p>by Singulier Oblige</p>
+                    </div>
+                """)
 
-        # Question input
-        question_input = gr.Textbox(
-            lines=4,
-            label="Your Question",
-            placeholder="Ask a question about the data...",
-            elem_id="question-input",
-            interactive=True,
-            show_label=False
-        )
+                # Question input
+                question_input = gr.Textbox(
+                    lines=5,
+                    label="Your Question",
+                    placeholder="Ask a question about the data...",
+                    elem_id="question-input",
+                    interactive=True,
+                    show_label=False
+                )
 
-        # Example prompts using proper Gradio buttons
-        gr.HTML('<div class="examples-wrapper"><div class="examples-label">Examples</div>')
+                # Example prompts
+                gr.HTML('<div class="examples-label">Examples</div>')
 
-        with gr.Row(elem_classes=["example-chips"]):
-            example1 = gr.Button("Retention by Demographics", elem_classes=["example-chip"])
-            example2 = gr.Button("GPA Trends", elem_classes=["example-chip"])
-            example3 = gr.Button("Graduation Statistics", elem_classes=["example-chip"])
-            example4 = gr.Button("Enrollment Distribution", elem_classes=["example-chip"])
+                with gr.Row(elem_classes=["example-row"]):
+                    with gr.Column(scale=1, elem_classes=["example-button"]):
+                        example1 = gr.Button("Retention by Demographics", size="sm")
+                    with gr.Column(scale=1, elem_classes=["example-button"]):
+                        example2 = gr.Button("GPA Trends", size="sm")
 
-        gr.HTML('</div>')
+                with gr.Row(elem_classes=["example-row"]):
+                    with gr.Column(scale=1, elem_classes=["example-button"]):
+                        example3 = gr.Button("Graduation Statistics", size="sm")
+                    with gr.Column(scale=1, elem_classes=["example-button"]):
+                        example4 = gr.Button("Enrollment Distribution", size="sm")
 
-        # Submit button
-        submit_btn = gr.Button(
-            "Send",
-            variant="primary"
-        )
+                # Submit button
+                submit_btn = gr.Button(
+                    "Send",
+                    variant="primary"
+                )
 
-        # API key section
-        gr.HTML('<div class="api-wrapper">')
-        api_key_input = gr.Textbox(
-            lines=1,
-            label="OpenAI API Key (Optional)",
-            placeholder="sk-proj-...",
-            type="password",
-            elem_id="api-key-input",
-            interactive=True
-        )
-        gr.HTML('<p class="api-info">Optional if set via environment variable. <a href="https://platform.openai.com/api-keys" target="_blank">Get your key</a></p>')
-        gr.HTML('</div>')
+                # API key section
+                gr.HTML('<div class="api-section">')
+                api_key_input = gr.Textbox(
+                    lines=1,
+                    label="OpenAI API Key (Optional)",
+                    placeholder="sk-proj-...",
+                    type="password",
+                    elem_id="api-key-input",
+                    interactive=True
+                )
+                gr.HTML('<p class="api-info">Optional if set via environment variable. <a href="https://platform.openai.com/api-keys" target="_blank">Get your key</a></p>')
+                gr.HTML('</div>')
 
-        # Results
-        output = gr.Textbox(
-            label="Results",
-            lines=20,
-            max_lines=50,
-            show_copy_button=True,
-            elem_id="output-results"
-        )
-
-        # About section
-        with gr.Accordion("About This Tool", open=False):
-            gr.Markdown("""
+                # About section
+                with gr.Accordion("About This Tool", open=False):
+                    gr.Markdown("""
 ### How It Works
 
 This tool employs a sophisticated three-step AI process:
@@ -495,7 +726,17 @@ Do not deploy with real student data without implementing:
 *No Ball State University student data or institutional resources were used in this project.*
 
 **Singulier Oblige** — Excellence in educational analytics
-            """)
+                    """)
+
+            # RIGHT COLUMN - Output side
+            with gr.Column(elem_classes=["right-column"], scale=2):
+                output = gr.Textbox(
+                    label="Results",
+                    lines=30,
+                    show_copy_button=True,
+                    elem_id="output-results",
+                    interactive=False
+                )
 
         # Connect the submit button
         submit_btn.click(
