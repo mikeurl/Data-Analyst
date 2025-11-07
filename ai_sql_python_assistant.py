@@ -446,12 +446,14 @@ def main():
     }
 
     .example-chips {
-        display: grid !important;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
+        display: flex !important;
+        flex-wrap: wrap !important;
         gap: 8px !important;
+        margin-bottom: 0 !important;
     }
 
-    .example-chip {
+    /* Target Gradio buttons with example-chip class */
+    .example-chip button {
         background: white !important;
         border: 1px solid #e5e7eb !important;
         border-radius: 8px !important;
@@ -460,11 +462,12 @@ def main():
         color: #374151 !important;
         cursor: pointer !important;
         transition: all 0.15s ease !important;
-        text-align: left !important;
-        display: block !important;
+        text-align: center !important;
+        font-weight: 400 !important;
+        min-width: 150px !important;
     }
 
-    .example-chip:hover {
+    .example-chip button:hover {
         background: #f9fafb !important;
         border-color: #10a37f !important;
         color: #111827 !important;
@@ -693,18 +696,16 @@ def main():
             elem_id="question-input"
         )
 
-        # Example prompts
-        gr.HTML("""
-            <div class="examples-wrapper">
-                <div class="examples-label">Examples</div>
-                <div class="example-chips">
-                    <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='What are the retention rates by race and ethnicity?'">Retention by Demographics</span>
-                    <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='Show me the average GPA by class year'">GPA Trends</span>
-                    <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='How many students graduated in each program?'">Graduation Statistics</span>
-                    <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='What is the distribution of students across different terms?'">Enrollment Distribution</span>
-                </div>
-            </div>
-        """)
+        # Example prompts using proper Gradio buttons
+        gr.HTML('<div class="examples-wrapper"><div class="examples-label">Examples</div>')
+
+        with gr.Row(elem_classes=["example-chips"]):
+            example1 = gr.Button("Retention by Demographics", elem_classes=["example-chip"])
+            example2 = gr.Button("GPA Trends", elem_classes=["example-chip"])
+            example3 = gr.Button("Graduation Statistics", elem_classes=["example-chip"])
+            example4 = gr.Button("Enrollment Distribution", elem_classes=["example-chip"])
+
+        gr.HTML('</div>')
 
         # Submit button
         submit_btn = gr.Button(
@@ -784,7 +785,7 @@ Do not deploy with real student data without implementing:
 **Singulier Oblige** — Excellence in educational analytics
             """)
 
-        # Connect the button
+        # Connect the submit button
         submit_btn.click(
             fn=ai_assistant,
             inputs=[question_input, api_key_input],
@@ -796,6 +797,24 @@ Do not deploy with real student data without implementing:
             fn=ai_assistant,
             inputs=[question_input, api_key_input],
             outputs=output
+        )
+
+        # Connect example buttons to populate the question input
+        example1.click(
+            lambda: "What are the retention rates by race and ethnicity?",
+            outputs=question_input
+        )
+        example2.click(
+            lambda: "Show me the average GPA by class year",
+            outputs=question_input
+        )
+        example3.click(
+            lambda: "How many students graduated in each program?",
+            outputs=question_input
+        )
+        example4.click(
+            lambda: "What is the distribution of students across different terms?",
+            outputs=question_input
         )
 
     demo.launch(share=False, server_port=7860)
