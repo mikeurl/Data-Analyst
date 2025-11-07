@@ -22,7 +22,7 @@ import re
 import sqlite3
 import sys
 
-import openai
+from openai import OpenAI
 import gradio as gr
 import pandas as pd
 
@@ -36,9 +36,9 @@ from SyntheticDataforSchema2 import generate_stable_population_data
 
 DB_PATH = "ipeds_data.db"  # Path to your SQLite DB file.
 
-# Get OpenAI API key from environment variable
-openai.api_key = os.getenv("OPENAI_API_KEY")
-if not openai.api_key:
+# Get OpenAI API key from environment variable - will create client when needed
+DEFAULT_API_KEY = os.getenv("OPENAI_API_KEY")
+if not DEFAULT_API_KEY:
     print("\n" + "="*70)
     print("WARNING: OPENAI_API_KEY environment variable not set.")
     print("="*70)
@@ -159,7 +159,7 @@ def run_python_code(py_code, df):
 # 4. GPT INTERACTION
 ###############################################################################
 
-def ask_gpt_for_sql(user_question):
+def ask_gpt_for_sql(user_question, client):
     """
     1) Fetch the live schema from the DB.
     2) Prompt GPT to write a SQL query (SQLite syntax) with no code fences.
@@ -178,14 +178,14 @@ The user wants the following:
 
 Please provide ONLY the SQL code, no triple backticks. End with a semicolon.
 """
-    response = openai.ChatCompletion.create(
-        model="gpt-4o",  # or "gpt-4" if you have access
+    response = client.chat.completions.create(
+        model="gpt-4o",
         messages=[{"role": "system", "content": prompt}],
         temperature=0.0
     )
-    return response["choices"][0]["message"]["content"]
+    return response.choices[0].message.content
 
-def ask_gpt_for_python(user_question, df_preview):
+def ask_gpt_for_python(user_question, df_preview, client):
     """
     Tells GPT: "We have a pandas DataFrame named 'df' from the SQL result.
     Provide Python code for further analysis, no triple backticks."
@@ -200,14 +200,14 @@ Preview of df:
 Write Python code that uses 'df' to further explore or summarize the data.
 Store final output in a variable named 'result'. Return ONLY the code (no triple backticks).
 """
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "system", "content": prompt}],
         temperature=0.2
     )
-    return response["choices"][0]["message"]["content"]
+    return response.choices[0].message.content
 
-def ask_gpt_for_explanation(sql_code, sql_result_str, py_code, py_result_str):
+def ask_gpt_for_explanation(sql_code, sql_result_str, py_code, py_result_str, client):
     """
     Combine everything into a final explanation for the user.
     """
@@ -228,12 +228,12 @@ We had the following steps:
 
 Provide a concise, friendly explanation of these results for the user.
 """
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "system", "content": prompt}],
         temperature=0.3
     )
-    return response["choices"][0]["message"]["content"]
+    return response.choices[0].message.content
 
 ###############################################################################
 # 5. GRADIO INTERFACE
@@ -246,8 +246,8 @@ def ai_assistant(user_input, api_key_input):
     3) GPT -> Python code, remove fences, run the code.
     4) GPT -> final explanation.
     """
-    # Use the API key from input if provided, otherwise use the global one
-    active_api_key = api_key_input.strip() if api_key_input and api_key_input.strip() else openai.api_key
+    # Use the API key from input if provided, otherwise use the default one
+    active_api_key = api_key_input.strip() if api_key_input and api_key_input.strip() else DEFAULT_API_KEY
 
     # Check if API key is set
     if not active_api_key:
@@ -266,55 +266,51 @@ Steps to get started:
 For more information, see the README.md file.
 """
 
-    # Temporarily set the API key for this request
-    original_key = openai.api_key
-    openai.api_key = active_api_key
+    # Create OpenAI client with the API key
+    client = OpenAI(api_key=active_api_key)
 
-    try:
-        # Step A: GPT for SQL
-        raw_sql_code = ask_gpt_for_sql(user_input)
-        # Clean out triple backticks or ```sql
-        sql_code_clean = remove_sql_fences(raw_sql_code)
+    # Step A: GPT for SQL
+    raw_sql_code = ask_gpt_for_sql(user_input, client)
+    # Clean out triple backticks or ```sql
+    sql_code_clean = remove_sql_fences(raw_sql_code)
 
-        # Execute
-        df_or_error = run_sql(sql_code_clean)
-        if isinstance(df_or_error, str) and df_or_error.startswith("SQL Error:"):
-            # The SQL failed
-            explanation = f"SQL query failed:\n{df_or_error}\n\nSQL was:\n{sql_code_clean}"
-            return explanation
+    # Execute
+    df_or_error = run_sql(sql_code_clean)
+    if isinstance(df_or_error, str) and df_or_error.startswith("SQL Error:"):
+        # The SQL failed
+        explanation = f"SQL query failed:\n{df_or_error}\n\nSQL was:\n{sql_code_clean}"
+        return explanation
 
-        # Build a short preview of the DataFrame
-        if isinstance(df_or_error, pd.DataFrame):
-            preview = df_or_error.head().to_string(index=False)
-            cols_list = df_or_error.columns.tolist()
-            df_preview_str = f"Columns: {cols_list}\nFirst 5 rows:\n{preview}"
-        else:
-            df_preview_str = str(df_or_error)
+    # Build a short preview of the DataFrame
+    if isinstance(df_or_error, pd.DataFrame):
+        preview = df_or_error.head().to_string(index=False)
+        cols_list = df_or_error.columns.tolist()
+        df_preview_str = f"Columns: {cols_list}\nFirst 5 rows:\n{preview}"
+    else:
+        df_preview_str = str(df_or_error)
 
-        # Step B: GPT for Python
-        raw_py_code = ask_gpt_for_python(user_input, df_preview_str)
-        py_code_clean = remove_python_fences(raw_py_code)
+    # Step B: GPT for Python
+    raw_py_code = ask_gpt_for_python(user_input, df_preview_str, client)
+    py_code_clean = remove_python_fences(raw_py_code)
 
-        py_result = run_python_code(py_code_clean, df_or_error)
+    py_result = run_python_code(py_code_clean, df_or_error)
 
-        # Step C: GPT final explanation
-        final_explanation = ask_gpt_for_explanation(
-            sql_code_clean,
-            df_preview_str,
-            py_code_clean,
-            py_result
-        )
+    # Step C: GPT final explanation
+    final_explanation = ask_gpt_for_explanation(
+        sql_code_clean,
+        df_preview_str,
+        py_code_clean,
+        py_result,
+        client
+    )
 
-        return (
-            f"[SQL CODE]\n{sql_code_clean}\n\n"
-            f"[SQL RESULT PREVIEW]\n{df_preview_str}\n\n"
-            f"[PYTHON CODE]\n{py_code_clean}\n\n"
-            f"[PYTHON RESULT]\n{py_result}\n\n"
-            f"[GPT EXPLANATION]\n{final_explanation}"
-        )
-    finally:
-        # Restore original API key
-        openai.api_key = original_key
+    return (
+        f"[SQL CODE]\n{sql_code_clean}\n\n"
+        f"[SQL RESULT PREVIEW]\n{df_preview_str}\n\n"
+        f"[PYTHON CODE]\n{py_code_clean}\n\n"
+        f"[PYTHON RESULT]\n{py_result}\n\n"
+        f"[GPT EXPLANATION]\n{final_explanation}"
+    )
 
 def main():
     """Launch the Gradio web interface for the AI assistant."""
@@ -348,309 +344,315 @@ def main():
     print(f"OpenAI Model: gpt-4o")
     print("\nLaunching Gradio interface...")
 
-    # Modern premium AI interface CSS
+    # ChatGPT-style interface - clean, minimal, focused
     custom_css = """
-    /* Import modern fonts */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    /* ChatGPT aesthetic - clean and minimal */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
-    /* Global background gradient */
+    /* Clean light background like ChatGPT */
     .gradio-container {
-        font-family: 'Inter', sans-serif !important;
-        background: linear-gradient(135deg, #1a1f2e 0%, #2d3748 100%) !important;
-        padding: 40px !important;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+        background: #f9fafb !important;
+        padding: 0 !important;
+        min-height: 100vh !important;
     }
 
-    /* Header row styling */
-    #header-row {
-        margin-bottom: 40px !important;
-        display: flex !important;
-        align-items: center !important;
+    /* Centered column like ChatGPT */
+    .main-wrapper {
+        max-width: 768px !important;
+        margin: 0 auto !important;
+        padding: 24px 16px !important;
     }
 
-    /* Logo container (left 20%) */
-    #logo-container {
-        width: 20% !important;
-        display: flex !important;
-        align-items: center !important;
+    /* Clean header */
+    .header-section {
+        text-align: center !important;
+        padding: 32px 0 24px 0 !important;
+        border-bottom: 1px solid #e5e7eb !important;
+        margin-bottom: 32px !important;
     }
 
-    #logo-container img {
-        max-width: 180px !important;
+    .header-section img {
+        max-width: 48px !important;
         height: auto !important;
-        filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3)) !important;
-    }
-
-    /* Title box (right 80%) - glassmorphism */
-    .title-box {
-        background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%) !important;
-        backdrop-filter: blur(10px) !important;
-        border: 1px solid rgba(255, 255, 255, 0.15) !important;
-        border-radius: 16px !important;
-        padding: 24px 32px !important;
-        text-align: right !important;
-        width: 80% !important;
-        margin-left: auto !important;
-    }
-
-    .title-box h1 {
-        font-size: 2rem !important;
-        font-weight: 600 !important;
-        color: #ffffff !important;
-        margin: 0 !important;
-        letter-spacing: 0.5px !important;
-    }
-
-    .title-box h2 {
-        font-size: 1.25rem !important;
-        font-weight: 400 !important;
-        color: rgba(255, 255, 255, 0.9) !important;
-        margin: 0.5rem 0 0 0 !important;
+        margin: 0 auto 16px auto !important;
         opacity: 0.9 !important;
     }
 
-    .title-box p {
-        font-size: 0.95rem !important;
-        color: rgba(255, 255, 255, 0.7) !important;
-        margin: 0.75rem 0 0 0 !important;
+    .header-section h1 {
+        font-size: 1.25rem !important;
+        font-weight: 600 !important;
+        color: #111827 !important;
+        margin: 0 !important;
     }
 
-    /* ALL textarea and input backgrounds - CORRECTED COLORS */
-    #question-input textarea,
-    #api-key-input input,
-    #output-results textarea,
-    input[type="password"],
-    textarea {
-        background: rgba(30, 41, 59, 0.8) !important;
-        border: 1px solid rgba(100, 116, 139, 0.3) !important;
-        border-radius: 8px !important;
-        color: #ffffff !important;
-        font-family: 'Inter', sans-serif !important;
-        padding: 12px 16px !important;
-        transition: all 0.3s ease !important;
-    }
-
-    #question-input textarea::placeholder,
-    #api-key-input input::placeholder,
-    input::placeholder,
-    textarea::placeholder {
-        opacity: 0.5 !important;
-        color: rgba(255, 255, 255, 0.5) !important;
-    }
-
-    #question-input textarea:focus,
-    #api-key-input input:focus,
-    #output-results textarea:focus,
-    input:focus,
-    textarea:focus {
-        outline: 2px solid #60a5fa !important;
-        outline-offset: 2px !important;
-        border-color: transparent !important;
-        box-shadow: none !important;
-    }
-
-    /* Question textarea - not dominating */
-    #question-input textarea {
-        min-height: 150px !important;
-        max-height: 200px !important;
-    }
-
-    /* Labels */
-    label {
-        font-weight: 500 !important;
-        color: rgba(255, 255, 255, 0.9) !important;
+    .header-section p {
         font-size: 0.875rem !important;
-        margin-bottom: 8px !important;
+        color: #6b7280 !important;
+        margin: 8px 0 0 0 !important;
+    }
+
+    /* ChatGPT-style input box */
+    #question-input {
+        margin-bottom: 24px !important;
+    }
+
+    #question-input label {
+        display: none !important;
+    }
+
+    #question-input textarea {
+        background: white !important;
+        border: 1px solid #d1d5db !important;
+        border-radius: 12px !important;
+        color: #111827 !important;
+        font-size: 1rem !important;
+        line-height: 1.5 !important;
+        padding: 16px !important;
+        resize: none !important;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+        transition: all 0.15s ease !important;
+    }
+
+    #question-input textarea::placeholder {
+        color: #9ca3af !important;
+    }
+
+    #question-input textarea:focus {
+        background: white !important;
+        border-color: #10a37f !important;
+        outline: none !important;
+        box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1) !important;
+    }
+
+    /* Example prompts - minimal chips */
+    .examples-wrapper {
+        margin-bottom: 24px !important;
+    }
+
+    .examples-label {
+        font-size: 0.75rem !important;
+        font-weight: 500 !important;
+        color: #6b7280 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.05em !important;
+        margin-bottom: 12px !important;
+    }
+
+    .example-chips {
+        display: grid !important;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
+        gap: 8px !important;
+    }
+
+    .example-chip {
+        background: white !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 8px !important;
+        padding: 12px 16px !important;
+        font-size: 0.875rem !important;
+        color: #374151 !important;
+        cursor: pointer !important;
+        transition: all 0.15s ease !important;
+        text-align: left !important;
         display: block !important;
     }
 
-    /* Submit button with gradient */
-    .submit-button {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        border: none !important;
+    .example-chip:hover {
+        background: #f9fafb !important;
+        border-color: #10a37f !important;
+        color: #111827 !important;
+    }
+
+    /* ChatGPT green button */
+    button[variant="primary"] {
+        background: #10a37f !important;
+        color: white !important;
+        font-weight: 500 !important;
+        font-size: 0.875rem !important;
+        padding: 12px 24px !important;
         border-radius: 8px !important;
-        color: #ffffff !important;
-        font-weight: 600 !important;
-        padding: 12px 32px !important;
-        font-size: 1rem !important;
+        border: none !important;
         cursor: pointer !important;
-        transition: all 0.3s ease !important;
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3) !important;
-        margin-top: 16px !important;
+        transition: all 0.15s ease !important;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
         width: 100% !important;
+        margin-bottom: 16px !important;
     }
 
-    .submit-button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4) !important;
+    button[variant="primary"]:hover {
+        background: #0d8f6f !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
     }
 
-    /* API key section - less prominent */
-    #api-key-section {
-        margin-top: 20px !important;
-        padding-top: 20px !important;
-        border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+    button[variant="primary"]:active {
+        background: #0b7a5f !important;
     }
 
-    #api-key-section label {
-        font-size: 0.8rem !important;
-        color: rgba(255, 255, 255, 0.6) !important;
+    /* API key section - minimal */
+    .api-wrapper {
+        background: #f3f4f6 !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 8px !important;
+        padding: 16px !important;
+        margin-bottom: 24px !important;
+    }
+
+    #api-key-input label {
+        font-size: 0.75rem !important;
+        font-weight: 500 !important;
+        color: #6b7280 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.05em !important;
+        margin-bottom: 8px !important;
+    }
+
+    #api-key-input input {
+        background: white !important;
+        border: 1px solid #d1d5db !important;
+        border-radius: 6px !important;
+        color: #111827 !important;
+        font-size: 0.875rem !important;
+        padding: 10px 12px !important;
+        font-family: 'SF Mono', Monaco, monospace !important;
+    }
+
+    #api-key-input input:focus {
+        border-color: #10a37f !important;
+        outline: none !important;
+        box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1) !important;
     }
 
     .api-info {
         font-size: 0.75rem !important;
-        color: rgba(255, 255, 255, 0.5) !important;
-        margin-top: 4px !important;
+        color: #6b7280 !important;
+        margin-top: 8px !important;
+        line-height: 1.5 !important;
     }
 
     .api-info a {
-        color: #60a5fa !important;
+        color: #10a37f !important;
         text-decoration: none !important;
+        font-weight: 500 !important;
     }
 
     .api-info a:hover {
         text-decoration: underline !important;
     }
 
-    /* Example chips - UPDATED COLORS */
-    .example-chips {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 12px !important;
-        margin-top: 20px !important;
+    /* Results section - clean */
+    #output-results {
+        margin-top: 32px !important;
     }
 
-    .example-chip {
-        background: rgba(79, 70, 229, 0.3) !important;
-        border: 1px solid rgba(79, 70, 229, 0.5) !important;
-        border-radius: 20px !important;
-        padding: 8px 16px !important;
-        font-size: 0.85rem !important;
-        color: rgba(255, 255, 255, 0.8) !important;
-        cursor: pointer !important;
-        transition: all 0.3s ease !important;
-        display: inline-block !important;
-    }
-
-    .example-chip:hover {
-        background: rgba(79, 70, 229, 0.5) !important;
-        border-color: rgba(79, 70, 229, 0.7) !important;
-        color: #ffffff !important;
-        transform: translateY(-1px) !important;
-    }
-
-    /* Output results specific styling */
-    #output-results textarea {
-        color: rgba(226, 232, 240, 0.9) !important;
-        font-family: 'Monaco', 'Courier New', monospace !important;
+    #output-results label {
         font-size: 0.875rem !important;
-        line-height: 1.6 !important;
-        min-height: 400px !important;
+        font-weight: 600 !important;
+        color: #111827 !important;
+        margin-bottom: 12px !important;
     }
 
-    /* Accordion styling - CONSISTENT WITH ANALYSIS RESULTS */
-    details {
-        background: rgba(30, 41, 59, 0.6) !important;
-        border: 1px solid rgba(100, 116, 139, 0.3) !important;
+    #output-results textarea {
+        background: white !important;
+        border: 1px solid #d1d5db !important;
         border-radius: 12px !important;
-        padding: 20px !important;
-        margin-top: 20px !important;
-        backdrop-filter: blur(10px) !important;
+        color: #111827 !important;
+        font-family: 'SF Mono', Monaco, 'Courier New', monospace !important;
+        font-size: 0.875rem !important;
+        line-height: 1.7 !important;
+        padding: 16px !important;
+        min-height: 400px !important;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+    }
+
+    /* About section - minimal accordion */
+    details {
+        background: white !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 8px !important;
+        padding: 16px !important;
+        margin-top: 32px !important;
     }
 
     summary {
         font-weight: 500 !important;
-        color: rgba(226, 232, 240, 0.9) !important;
+        font-size: 0.875rem !important;
+        color: #374151 !important;
         cursor: pointer !important;
-        font-size: 0.95rem !important;
+        list-style: none !important;
+    }
+
+    summary::-webkit-details-marker {
+        display: none !important;
     }
 
     summary:hover {
-        color: #60a5fa !important;
+        color: #111827 !important;
     }
 
-    details p, details ul, details li {
-        color: rgba(226, 232, 240, 0.9) !important;
+    details[open] summary {
+        margin-bottom: 16px !important;
+        padding-bottom: 12px !important;
+        border-bottom: 1px solid #f3f4f6 !important;
+    }
+
+    details p, details li {
+        color: #4b5563 !important;
         line-height: 1.6 !important;
+        font-size: 0.875rem !important;
     }
 
     details h3 {
-        color: rgba(226, 232, 240, 0.95) !important;
+        color: #111827 !important;
+        font-size: 0.875rem !important;
+        font-weight: 600 !important;
+        margin: 16px 0 8px 0 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.025em !important;
     }
 
-    /* Links */
-    a {
-        color: #60a5fa !important;
+    details h3:first-of-type {
+        margin-top: 0 !important;
+    }
+
+    details a {
+        color: #10a37f !important;
         text-decoration: none !important;
+        font-weight: 500 !important;
     }
 
-    a:hover {
+    details a:hover {
         text-decoration: underline !important;
     }
 
-    /* Loading spinner */
-    .loading {
-        opacity: 0.6 !important;
-        pointer-events: none !important;
-    }
-
-    /* Scrollbar */
+    /* Clean scrollbar */
     ::-webkit-scrollbar {
-        width: 10px !important;
+        width: 8px !important;
+        height: 8px !important;
     }
 
     ::-webkit-scrollbar-track {
-        background: rgba(0, 0, 0, 0.2) !important;
+        background: transparent !important;
     }
 
     ::-webkit-scrollbar-thumb {
-        background: rgba(102, 126, 234, 0.3) !important;
-        border-radius: 5px !important;
+        background: #d1d5db !important;
+        border-radius: 4px !important;
     }
 
     ::-webkit-scrollbar-thumb:hover {
-        background: rgba(102, 126, 234, 0.5) !important;
+        background: #9ca3af !important;
     }
 
-    /* Spacing utilities */
-    .section-spacing {
-        margin-bottom: 20px !important;
-    }
+    /* Responsive */
+    @media (max-width: 640px) {
+        .main-wrapper {
+            padding: 16px 12px !important;
+        }
 
-    /* Override Gradio button defaults - PERFECT BUTTON */
-    button[variant="primary"],
-    .submit-button,
-    button.primary {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        color: white !important;
-        font-weight: 600 !important;
-        padding: 16px 48px !important;
-        border-radius: 8px !important;
-        border: none !important;
-        cursor: pointer !important;
-        transition: all 0.3s ease !important;
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3) !important;
-        margin-top: 16px !important;
-        font-size: 1rem !important;
-        letter-spacing: 0.3px !important;
-    }
-
-    button[variant="primary"]:hover,
-    .submit-button:hover,
-    button.primary:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4) !important;
-    }
-
-    button[variant="primary"]:active,
-    .submit-button:active {
-        transform: translateY(0) !important;
-    }
-
-    /* Component spacing */
-    #question-input,
-    #api-key-input,
-    button[variant="primary"] {
-        margin-bottom: 16px !important;
+        .example-chips {
+            grid-template-columns: 1fr !important;
+        }
     }
     """
 
@@ -664,49 +666,48 @@ def main():
         body_background_fill_dark="*neutral_950",
     )
 
-    # Build modern premium AI interface
+    # Build clean ChatGPT-style interface
     with gr.Blocks(theme=theme, css=custom_css, title="Higher Education AI Analyst") as demo:
 
-        # HEADER: Logo (left 20%) + Title Box (right 80%)
-        with gr.Row(elem_id="header-row"):
-            # Logo container
-            with gr.Column(scale=2):
-                gr.HTML("""
-                    <div id="logo-container">
-                        <img src="https://raw.githubusercontent.com/mikeurl/Data-Analyst/claude/review-repo-structure-011CUqm6vjgy43VX5NmComtm/docs/logo.png"
-                             alt="Singulier Oblige">
-                    </div>
-                """)
-
-            # Title box with glassmorphism
-            with gr.Column(scale=8):
-                gr.HTML("""
-                    <div class="title-box">
-                        <h1>Singulier Oblige</h1>
-                        <h2>Higher Education AI Analyst</h2>
-                        <p>Transform your questions into insights. Ask in plain language, receive intelligent analysis.</p>
-                    </div>
-                """)
-
-        # Question input
-        question_input = gr.Textbox(
-            lines=6,
-            label="Ask Your Question",
-            placeholder="e.g., 'Show me retention rates by race/ethnicity' or 'What's the average GPA by class year?'",
-            elem_id="question-input"
-        )
-
-        # Example query chips
+        # Clean header with logo and title
         gr.HTML("""
-            <div class="example-chips">
-                <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='What are the retention rates by race and ethnicity?'">📊 Retention by Demographics</span>
-                <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='Show me the average GPA by class year'">📈 GPA Trends</span>
-                <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='How many students graduated in each program?'">🎓 Graduation Stats</span>
-                <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='What is the distribution of students across different terms?'">📅 Enrollment Distribution</span>
+            <div class="header-section">
+                <img src="https://raw.githubusercontent.com/mikeurl/Data-Analyst/claude/review-repo-structure-011CUqm6vjgy43VX5NmComtm/docs/logo.png"
+                     alt="Singulier Oblige">
+                <h1>Higher Education AI Analyst</h1>
+                <p>by Singulier Oblige</p>
             </div>
         """)
 
-        # API Key section
+        # Question input
+        question_input = gr.Textbox(
+            lines=4,
+            label="",
+            placeholder="Ask a question about the data...",
+            elem_id="question-input"
+        )
+
+        # Example prompts
+        gr.HTML("""
+            <div class="examples-wrapper">
+                <div class="examples-label">Examples</div>
+                <div class="example-chips">
+                    <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='What are the retention rates by race and ethnicity?'">Retention by Demographics</span>
+                    <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='Show me the average GPA by class year'">GPA Trends</span>
+                    <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='How many students graduated in each program?'">Graduation Statistics</span>
+                    <span class="example-chip" onclick="document.querySelector('#question-input textarea').value='What is the distribution of students across different terms?'">Enrollment Distribution</span>
+                </div>
+            </div>
+        """)
+
+        # Submit button
+        submit_btn = gr.Button(
+            "Send",
+            variant="primary"
+        )
+
+        # API key section
+        gr.HTML('<div class="api-wrapper">')
         api_key_input = gr.Textbox(
             lines=1,
             label="OpenAI API Key (Optional)",
@@ -714,18 +715,12 @@ def main():
             type="password",
             elem_id="api-key-input"
         )
-        gr.HTML('<p class="api-info">Leave blank if set via environment variable. Get your API key at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a></p>')
+        gr.HTML('<p class="api-info">Optional if set via environment variable. <a href="https://platform.openai.com/api-keys" target="_blank">Get your key</a></p>')
+        gr.HTML('</div>')
 
-        # Submit button
-        submit_btn = gr.Button(
-            "🔍 Analyze Data",
-            variant="primary",
-            size="lg"
-        )
-
-        # Output section
+        # Results
         output = gr.Textbox(
-            label="📄 Analysis Results",
+            label="Results",
             lines=20,
             max_lines=50,
             show_copy_button=True,
@@ -733,7 +728,7 @@ def main():
         )
 
         # About section
-        with gr.Accordion("ℹ️ About This Tool", open=False):
+        with gr.Accordion("About This Tool", open=False):
             gr.Markdown("""
 ### How It Works
 
