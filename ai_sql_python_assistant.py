@@ -414,20 +414,12 @@ def main():
         margin: 0.75rem 0 0 0 !important;
     }
 
-    /* Form card - hero element */
-    .form-card {
-        background: rgba(255, 255, 255, 0.05) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-radius: 12px !important;
-        padding: 32px !important;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
-        backdrop-filter: blur(10px) !important;
-        margin-bottom: 20px !important;
-    }
-
-    /* Input fields with subtle borders - FIXED COLORS */
-    .form-card input,
-    .form-card textarea {
+    /* ALL textarea and input backgrounds - CORRECTED COLORS */
+    #question-input textarea,
+    #api-key-input input,
+    #output-results textarea,
+    input[type="password"],
+    textarea {
         background: rgba(30, 41, 59, 0.8) !important;
         border: 1px solid rgba(100, 116, 139, 0.3) !important;
         border-radius: 8px !important;
@@ -437,14 +429,19 @@ def main():
         transition: all 0.3s ease !important;
     }
 
-    .form-card input::placeholder,
-    .form-card textarea::placeholder {
+    #question-input textarea::placeholder,
+    #api-key-input input::placeholder,
+    input::placeholder,
+    textarea::placeholder {
         opacity: 0.5 !important;
         color: rgba(255, 255, 255, 0.5) !important;
     }
 
-    .form-card input:focus,
-    .form-card textarea:focus {
+    #question-input textarea:focus,
+    #api-key-input input:focus,
+    #output-results textarea:focus,
+    input:focus,
+    textarea:focus {
         outline: 2px solid #60a5fa !important;
         outline-offset: 2px !important;
         border-color: transparent !important;
@@ -458,7 +455,7 @@ def main():
     }
 
     /* Labels */
-    .form-card label {
+    label {
         font-weight: 500 !important;
         color: rgba(255, 255, 255, 0.9) !important;
         font-size: 0.875rem !important;
@@ -514,7 +511,7 @@ def main():
         text-decoration: underline !important;
     }
 
-    /* Example chips */
+    /* Example chips - UPDATED COLORS */
     .example-chips {
         display: flex !important;
         flex-wrap: wrap !important;
@@ -523,8 +520,8 @@ def main():
     }
 
     .example-chip {
-        background: rgba(102, 126, 234, 0.15) !important;
-        border: 1px solid rgba(102, 126, 234, 0.3) !important;
+        background: rgba(79, 70, 229, 0.3) !important;
+        border: 1px solid rgba(79, 70, 229, 0.5) !important;
         border-radius: 20px !important;
         padding: 8px 16px !important;
         font-size: 0.85rem !important;
@@ -535,53 +532,34 @@ def main():
     }
 
     .example-chip:hover {
-        background: rgba(102, 126, 234, 0.25) !important;
-        border-color: rgba(102, 126, 234, 0.5) !important;
+        background: rgba(79, 70, 229, 0.5) !important;
+        border-color: rgba(79, 70, 229, 0.7) !important;
         color: #ffffff !important;
         transform: translateY(-1px) !important;
     }
 
-    /* Output area - FIXED BACKGROUND */
-    .output-section {
+    /* Output results specific styling */
+    #output-results textarea {
+        color: rgba(226, 232, 240, 0.9) !important;
+        font-family: 'Monaco', 'Courier New', monospace !important;
+        font-size: 0.875rem !important;
+        line-height: 1.6 !important;
+        min-height: 400px !important;
+    }
+
+    /* Accordion styling - CONSISTENT WITH ANALYSIS RESULTS */
+    details {
         background: rgba(30, 41, 59, 0.6) !important;
         border: 1px solid rgba(100, 116, 139, 0.3) !important;
         border-radius: 12px !important;
-        padding: 24px !important;
+        padding: 20px !important;
         margin-top: 20px !important;
         backdrop-filter: blur(10px) !important;
     }
 
-    .output-section label {
-        font-weight: 600 !important;
-        color: #ffffff !important;
-        font-size: 1rem !important;
-        margin-bottom: 12px !important;
-        letter-spacing: 0.3px !important;
-    }
-
-    .output-section textarea {
-        background: rgba(15, 23, 42, 0.8) !important;
-        border: 1px solid rgba(100, 116, 139, 0.2) !important;
-        border-radius: 8px !important;
-        color: #e2e8f0 !important;
-        font-family: 'Monaco', 'Courier New', monospace !important;
-        font-size: 0.875rem !important;
-        line-height: 1.6 !important;
-        padding: 16px !important;
-    }
-
-    /* Accordion styling */
-    details {
-        background: rgba(255, 255, 255, 0.03) !important;
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        border-radius: 12px !important;
-        padding: 16px !important;
-        margin-top: 20px !important;
-    }
-
     summary {
         font-weight: 500 !important;
-        color: rgba(255, 255, 255, 0.8) !important;
+        color: rgba(226, 232, 240, 0.9) !important;
         cursor: pointer !important;
         font-size: 0.95rem !important;
     }
@@ -591,8 +569,12 @@ def main():
     }
 
     details p, details ul, details li {
-        color: rgba(255, 255, 255, 0.7) !important;
+        color: rgba(226, 232, 240, 0.9) !important;
         line-height: 1.6 !important;
+    }
+
+    details h3 {
+        color: rgba(226, 232, 240, 0.95) !important;
     }
 
     /* Links */
@@ -664,13 +646,11 @@ def main():
         transform: translateY(0) !important;
     }
 
-    /* Improve form card spacing */
-    .form-card > * {
+    /* Component spacing */
+    #question-input,
+    #api-key-input,
+    button[variant="primary"] {
         margin-bottom: 16px !important;
-    }
-
-    .form-card > *:last-child {
-        margin-bottom: 0 !important;
     }
     """
 
@@ -708,9 +688,6 @@ def main():
                     </div>
                 """)
 
-        # FORM CARD - Hero Element (no wrapper needed)
-        gr.HTML('<div class="form-card">')
-
         # Question input
         question_input = gr.Textbox(
             lines=6,
@@ -729,16 +706,15 @@ def main():
             </div>
         """)
 
-        # API Key section - less prominent
-        gr.HTML('<div id="api-key-section">')
+        # API Key section
         api_key_input = gr.Textbox(
             lines=1,
             label="OpenAI API Key (Optional)",
             placeholder="sk-proj-...",
-            type="password"
+            type="password",
+            elem_id="api-key-input"
         )
         gr.HTML('<p class="api-info">Leave blank if set via environment variable. Get your API key at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a></p>')
-        gr.HTML('</div>')  # Close api-key-section
 
         # Submit button
         submit_btn = gr.Button(
@@ -747,17 +723,14 @@ def main():
             size="lg"
         )
 
-        gr.HTML('</div>')  # Close form-card
-
         # Output section
-        gr.HTML('<div class="output-section section-spacing">')
         output = gr.Textbox(
             label="📄 Analysis Results",
             lines=20,
             max_lines=50,
-            show_copy_button=True
+            show_copy_button=True,
+            elem_id="output-results"
         )
-        gr.HTML('</div>')  # Close output-section
 
         # About section
         with gr.Accordion("ℹ️ About This Tool", open=False):
