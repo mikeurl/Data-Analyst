@@ -359,20 +359,6 @@ def main():
         background: linear-gradient(135deg, #0f1419 0%, #1a1f2e 100%) !important;
     }
 
-    /* Logo and header section */
-    .logo-container {
-        text-align: center;
-        padding: 2rem 0 1rem 0;
-        background: transparent;
-    }
-
-    .logo-container img {
-        max-width: 200px;
-        height: auto;
-        margin: 0 auto;
-        filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
-    }
-
     .tagline {
         font-family: 'Crimson Pro', serif !important;
         font-size: 1.5rem !important;
@@ -565,10 +551,12 @@ def main():
 
     # Build interface using Blocks for complete control
     with gr.Blocks(theme=theme, css=custom_css, title="Higher Education AI Analyst") as demo:
-        # Logo and header
+        # Logo and header - centered
         gr.HTML("""
-            <div class="logo-container">
-                <img src="file/docs/logo.png" alt="Singulier Oblige">
+            <div style="text-align: center; padding: 2rem 0 1rem 0;">
+                <img src="https://raw.githubusercontent.com/mikeurl/Data-Analyst/claude/review-repo-structure-011CUqm6vjgy43VX5NmComtm/docs/logo.png"
+                     alt="Singulier Oblige"
+                     style="max-width: 200px; height: auto; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));">
             </div>
         """)
 
