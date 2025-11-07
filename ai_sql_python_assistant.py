@@ -392,17 +392,18 @@ def main():
         margin: 8px 0 0 0 !important;
     }
 
-    /* ChatGPT-style input box */
-    #question-input {
+    /* ChatGPT-style input box using wrapper class */
+    .question-input-wrapper {
         margin-bottom: 24px !important;
-        display: block !important;
     }
 
-    #question-input label {
+    .question-input-wrapper label {
         display: none !important;
     }
 
-    #question-input textarea {
+    /* Target Gradio's actual textarea element */
+    .question-input-wrapper .gradio-textbox textarea,
+    .question-input-wrapper textarea {
         background: white !important;
         border: 1px solid #d1d5db !important;
         border-radius: 12px !important;
@@ -411,21 +412,18 @@ def main():
         line-height: 1.5 !important;
         padding: 16px !important;
         min-height: 120px !important;
-        height: auto !important;
         resize: vertical !important;
         box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
         transition: all 0.15s ease !important;
-        width: 100% !important;
-        display: block !important;
-        pointer-events: auto !important;
     }
 
-    #question-input textarea::placeholder {
+    .question-input-wrapper .gradio-textbox textarea::placeholder,
+    .question-input-wrapper textarea::placeholder {
         color: #9ca3af !important;
     }
 
-    #question-input textarea:focus {
-        background: white !important;
+    .question-input-wrapper .gradio-textbox textarea:focus,
+    .question-input-wrapper textarea:focus {
         border-color: #10a37f !important;
         outline: none !important;
         box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1) !important;
@@ -507,7 +505,7 @@ def main():
         margin-bottom: 24px !important;
     }
 
-    #api-key-input label {
+    .api-key-input-wrapper label {
         font-size: 0.75rem !important;
         font-weight: 500 !important;
         color: #6b7280 !important;
@@ -516,7 +514,8 @@ def main():
         margin-bottom: 8px !important;
     }
 
-    #api-key-input input {
+    .api-key-input-wrapper input,
+    .api-key-input-wrapper .gradio-textbox input {
         background: white !important;
         border: 1px solid #d1d5db !important;
         border-radius: 6px !important;
@@ -526,7 +525,8 @@ def main():
         font-family: 'SF Mono', Monaco, monospace !important;
     }
 
-    #api-key-input input:focus {
+    .api-key-input-wrapper input:focus,
+    .api-key-input-wrapper .gradio-textbox input:focus {
         border-color: #10a37f !important;
         outline: none !important;
         box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1) !important;
@@ -693,7 +693,8 @@ def main():
             lines=4,
             label="",
             placeholder="Ask a question about the data...",
-            elem_id="question-input"
+            elem_classes=["question-input-wrapper"],
+            interactive=True
         )
 
         # Example prompts using proper Gradio buttons
@@ -720,7 +721,8 @@ def main():
             label="OpenAI API Key (Optional)",
             placeholder="sk-proj-...",
             type="password",
-            elem_id="api-key-input"
+            elem_classes=["api-key-input-wrapper"],
+            interactive=True
         )
         gr.HTML('<p class="api-info">Optional if set via environment variable. <a href="https://platform.openai.com/api-keys" target="_blank">Get your key</a></p>')
         gr.HTML('</div>')
