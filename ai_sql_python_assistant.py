@@ -29,6 +29,19 @@ import sys
 from openai import OpenAI
 import gradio as gr
 import pandas as pd
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+try:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+except ImportError:  # pragma: no cover - optional dependency in some deployments
+    matplotlib = None
+    plt = None
 
 matplotlib = None
 plt = None
