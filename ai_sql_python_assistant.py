@@ -401,10 +401,6 @@ def main():
         color: inherit;
     }
 
-    .gradio-container * {
-        color: inherit;
-    }
-
     /* Two-column layout */
     .two-column-container {
         display: grid !important;
@@ -590,18 +586,16 @@ def main():
 
     /* Output results */
     .results-tabs {
-        background: rgba(15, 23, 42, 0.72) !important;
-        border: 1px solid rgba(148, 163, 184, 0.16) !important;
-        border-radius: 18px !important;
-        padding: 12px 12px 18px 12px !important;
-        box-shadow: 0 18px 32px -24px rgba(15, 23, 42, 0.9) !important;
-        backdrop-filter: blur(18px);
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        box-shadow: none !important;
     }
 
     .results-tabs .tab-nav {
         gap: 8px !important;
         border: none !important;
-        padding: 0 4px 10px 4px !important;
+        padding: 0 4px 12px 4px !important;
         background: transparent !important;
     }
 
@@ -619,6 +613,12 @@ def main():
         background: linear-gradient(135deg, rgba(99, 102, 241, 0.22), rgba(56, 189, 248, 0.18)) !important;
         border-color: rgba(56, 189, 248, 0.5) !important;
         color: #e2e8f0 !important;
+    }
+
+    .results-tabs .tab-panels {
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
     }
 
     .results-pane {
