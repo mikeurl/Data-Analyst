@@ -171,20 +171,21 @@ def check_user_intent(user_input):
     user_normalized = user_input.lower()
 
     # Destructive intent keywords and phrases
+    # Use .* to allow words between verb and object (e.g., "drop the students table")
     destructive_patterns = [
-        (r'\b(drop|delete|remove|erase)\s+(table|database|column|row|record|data)',
+        (r'\b(drop|delete|remove|erase).*(table|database|column)',
          'DROP/DELETE operations'),
-        (r'\b(delete|remove|erase)\s+(all|everything|rows?|records?|data)',
+        (r'\b(delete|remove|erase).*(all|everything|rows?|records?|data|from)',
          'DELETE operations'),
-        (r'\b(update|modify|change|edit|set)\s+.+\s+(to|=)',
+        (r'\b(update|modify|change|edit|set).*(to|=|where)',
          'UPDATE operations'),
-        (r'\b(truncate|clear|wipe)\s+(table|database|data)',
+        (r'\b(truncate|clear|wipe).*(table|database|data)',
          'TRUNCATE operations'),
-        (r'\b(alter|rename)\s+(table|column|database)',
+        (r'\b(alter|rename).*(table|column|database)',
          'ALTER operations'),
-        (r'\b(insert|add)\s+(into|to|new)\s+(?!temp|temporary)',
+        (r'\b(insert|add).*(into|to)\s+(?!temp|temporary)',
          'INSERT operations into permanent tables'),
-        (r'\b(create)\s+table\s+(?!temp|temporary)',
+        (r'\bcreate\s+table\s+(?!temp|temporary)',
          'CREATE permanent table operations'),
     ]
 
