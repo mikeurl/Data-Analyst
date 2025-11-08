@@ -311,9 +311,9 @@ Decide if Python (e.g., advanced statistics, regressions, complex reshaping) is 
 Respond strictly in JSON with keys:
   requires_python: boolean
   reason: short string explaining your decision
-  recommended_presentation: one of ["narrative", "table", "chart", "table_and_chart"]
+  recommended_presentation: one of ["narrative", "table"]
 
-Choose "chart" or "table_and_chart" when the data benefits from visualization (e.g., trends, comparisons, distributions).
+Prefer a table when structured data helps the explanation; otherwise provide a narrative summary.
 If the preview is empty, set requires_python to false.
 """
 
@@ -355,15 +355,6 @@ def dataframe_to_markdown(df, max_rows=20):
     except Exception:
         return preview_df.to_string(index=False)
 
-
-def generate_quick_chart(df):
-    """Placeholder for quick chart generation; returns None when unavailable."""
-    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-        return None
-
-    # Chart generation has been disabled for this deployment because no
-    # plotting backend is bundled. The assistant will rely on tables instead.
-    return None
 
 ###############################################################################
 # 5. GRADIO INTERFACE
@@ -444,12 +435,6 @@ For more information, see the README.md file.
     requires_python = plan.get("requires_python", False)
 
     table_markdown = dataframe_to_markdown(df_or_error)
-    chart_markdown = None
-    if plan.get("recommended_presentation") in {"chart", "table_and_chart"}:
-        chart_markdown = generate_quick_chart(df_or_error)
-        if not chart_markdown and plan.get("recommended_presentation") in {"chart", "table_and_chart"}:
-            # fallback to table if chart generation fails
-            plan["recommended_presentation"] = "table"
 
     # Step B: GPT for Python (conditional)
     python_used = False
@@ -478,11 +463,8 @@ For more information, see the README.md file.
         "### Assistant Explanation\n" + f"{final_explanation}",
     ]
 
-    if plan.get("recommended_presentation") in {"table", "table_and_chart"} and table_markdown:
+    if plan.get("recommended_presentation") == "table" and table_markdown:
         summary_sections.append("### Result Snapshot\n" + table_markdown)
-
-    if chart_markdown:
-        summary_sections.append("### Visual Summary\n" + chart_markdown)
 
     summary_tab = "\n\n".join(summary_sections)
 
