@@ -33,6 +33,15 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+try:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+except ImportError:  # pragma: no cover - optional dependency in some deployments
+    matplotlib = None
+    plt = None
+
 # Import database setup functions for auto-initialization
 from create_ipeds_db_schema import create_ipeds_db_schema
 from SyntheticDataforSchema2 import generate_stable_population_data
@@ -329,7 +338,7 @@ def dataframe_to_markdown(df, max_rows=20):
 
 def generate_quick_chart(df):
     """Create a simple chart encoded as a Markdown image when data supports it."""
-    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+    if plt is None or df is None or not isinstance(df, pd.DataFrame) or df.empty:
         return None
 
     df_numeric = df.select_dtypes(include="number")
