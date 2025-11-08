@@ -159,6 +159,41 @@ def run_python_code(py_code, df):
 # 4. GPT INTERACTION
 ###############################################################################
 
+def check_user_intent(user_input):
+    """
+    Checks if the user is asking for a destructive operation.
+    This catches requests BEFORE SQL is generated, so we can warn users
+    rather than silently converting their request to a SELECT.
+
+    Returns: (is_safe: bool, warning_message: str or None)
+    """
+    # Normalize input
+    user_normalized = user_input.lower()
+
+    # Destructive intent keywords and phrases
+    destructive_patterns = [
+        (r'\b(drop|delete|remove|erase)\s+(table|database|column|row|record|data)',
+         'DROP/DELETE operations'),
+        (r'\b(delete|remove|erase)\s+(all|everything|rows?|records?|data)',
+         'DELETE operations'),
+        (r'\b(update|modify|change|edit|set)\s+.+\s+(to|=)',
+         'UPDATE operations'),
+        (r'\b(truncate|clear|wipe)\s+(table|database|data)',
+         'TRUNCATE operations'),
+        (r'\b(alter|rename)\s+(table|column|database)',
+         'ALTER operations'),
+        (r'\b(insert|add)\s+(into|to|new)\s+(?!temp|temporary)',
+         'INSERT operations into permanent tables'),
+        (r'\b(create)\s+table\s+(?!temp|temporary)',
+         'CREATE permanent table operations'),
+    ]
+
+    for pattern, operation_type in destructive_patterns:
+        if re.search(pattern, user_normalized):
+            return False, f"🛡️ **Destructive Operation Detected**\n\nYour request appears to ask for **{operation_type}**, which are not allowed in this read-only interface.\n\n**This interface is designed for data analysis only.**\n\nYou can:\n- ✅ Query data with SELECT statements\n- ✅ Analyze trends, statistics, and patterns\n- ✅ Create temporary tables for complex analysis\n\nYou cannot:\n- ❌ Modify, delete, or drop existing data\n- ❌ Create permanent tables or alter schema\n\nPlease rephrase your question to focus on analyzing or viewing data rather than modifying it."
+
+    return True, None
+
 def validate_sql_safety(sql_code):
     """
     Validates that SQL contains only safe, read-only operations.
@@ -332,6 +367,29 @@ For more information, see the README.md file.
 
     # Create OpenAI client with the API key
     client = OpenAI(api_key=active_api_key)
+
+    # SECURITY: Check user intent before generating SQL
+    intent_is_safe, intent_warning = check_user_intent(user_input)
+    if not intent_is_safe:
+        # User is asking for a destructive operation
+        sql_details = (
+            "### Request Blocked Before SQL Generation\n\n"
+            "The system detected that your request involves data modification or schema changes, "
+            "which are not permitted in this read-only analysis interface.\n\n"
+            "**Common phrases that trigger this protection:**\n"
+            "- 'drop table/database/column'\n"
+            "- 'delete records/rows/data'\n"
+            "- 'update... to...'\n"
+            "- 'insert into' (permanent tables)\n"
+            "- 'alter table'\n"
+            "- 'truncate table'\n\n"
+            "**Try rephrasing to:**\n"
+            "- 'Show me students with...'\n"
+            "- 'What is the average...'\n"
+            "- 'List all records where...'\n"
+            "- 'Analyze trends in...'"
+        )
+        return intent_warning, sql_details, "Python analysis was not executed because the request was blocked."
 
     # Step A: GPT for SQL
     raw_sql_code = ask_gpt_for_sql(user_input, client)
