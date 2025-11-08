@@ -251,7 +251,7 @@ def ai_assistant(user_input, api_key_input):
 
     # Check if API key is set
     if not active_api_key:
-        return """
+        message = """
 ❌ OpenAI API Key Not Set
 
 To use this AI assistant, you need to set your OpenAI API key.
@@ -265,6 +265,7 @@ Steps to get started:
 
 For more information, see the README.md file.
 """
+        return message, "Awaiting a valid API key to generate SQL details.", "Awaiting a valid API key to generate Python details."
 
     # Create OpenAI client with the API key
     client = OpenAI(api_key=active_api_key)
@@ -278,8 +279,14 @@ For more information, see the README.md file.
     df_or_error = run_sql(sql_code_clean)
     if isinstance(df_or_error, str) and df_or_error.startswith("SQL Error:"):
         # The SQL failed
-        explanation = f"SQL query failed:\n{df_or_error}\n\nSQL was:\n{sql_code_clean}"
-        return explanation
+        explanation = f"SQL query failed. Please review the SQL details tab for more information.\n\n{df_or_error}"
+        sql_details = (
+            "### Generated SQL\n"
+            f"```sql\n{sql_code_clean}\n```\n\n"
+            "### Error\n"
+            f"{df_or_error}"
+        )
+        return explanation, sql_details, "Python analysis was not executed because the SQL step failed."
 
     # Build a short preview of the DataFrame
     if isinstance(df_or_error, pd.DataFrame):
@@ -304,13 +311,28 @@ For more information, see the README.md file.
         client
     )
 
-    return (
-        f"[SQL CODE]\n{sql_code_clean}\n\n"
-        f"[SQL RESULT PREVIEW]\n{df_preview_str}\n\n"
-        f"[PYTHON CODE]\n{py_code_clean}\n\n"
-        f"[PYTHON RESULT]\n{py_result}\n\n"
-        f"[GPT EXPLANATION]\n{final_explanation}"
+    summary_tab = (
+        "### Your Question\n"
+        f"{user_input}\n\n"
+        "### Assistant Explanation\n"
+        f"{final_explanation}"
     )
+
+    sql_tab = (
+        "### Generated SQL\n"
+        f"```sql\n{sql_code_clean}\n```\n\n"
+        "### SQL Result Preview\n"
+        f"```\n{df_preview_str}\n```"
+    )
+
+    python_tab = (
+        "### Python Analysis Code\n"
+        f"```python\n{py_code_clean}\n```\n\n"
+        "### Python Output\n"
+        f"```\n{py_result}\n```"
+    )
+
+    return summary_tab, sql_tab, python_tab
 
 def main():
     """Launch the Gradio web interface for the AI assistant."""
@@ -543,21 +565,62 @@ def main():
     }
 
     /* Output results */
-    #output-results textarea {
-        background: rgba(15, 23, 42, 0.85) !important;
+    .results-tabs {
+        background: rgba(15, 23, 42, 0.72) !important;
+        border: 1px solid rgba(148, 163, 184, 0.16) !important;
+        border-radius: 18px !important;
+        padding: 12px 12px 18px 12px !important;
+        box-shadow: 0 18px 32px -24px rgba(15, 23, 42, 0.9) !important;
+        backdrop-filter: blur(18px);
+    }
+
+    .results-tabs .tab-nav {
+        gap: 8px !important;
+        border: none !important;
+        padding: 0 4px 10px 4px !important;
+        background: transparent !important;
+    }
+
+    .results-tabs .tab-nav button {
+        background: rgba(15, 23, 42, 0.6) !important;
         border: 1px solid rgba(148, 163, 184, 0.18) !important;
-        border-radius: 16px !important;
-        padding: 18px !important;
-        height: clamp(200px, 34vh, 320px) !important;
+        border-radius: 10px !important;
+        padding: 8px 16px !important;
+        font-size: 0.85rem !important;
+        color: #cbd5f5 !important;
+        transition: background 0.2s ease, border-color 0.2s ease !important;
+    }
+
+    .results-tabs .tab-nav button[aria-selected="true"] {
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.22), rgba(56, 189, 248, 0.18)) !important;
+        border-color: rgba(56, 189, 248, 0.5) !important;
+        color: #e2e8f0 !important;
+    }
+
+    .results-pane {
+        background: rgba(10, 19, 35, 0.9) !important;
+        border: 1px solid rgba(148, 163, 184, 0.16) !important;
+        border-radius: 14px !important;
+        padding: 20px !important;
         min-height: 200px !important;
         max-height: 340px !important;
-        font-family: 'SF Mono', Monaco, 'Courier New', monospace !important;
+        overflow-y: auto !important;
         font-size: 0.9rem !important;
         line-height: 1.55 !important;
         color: #f8fafc !important;
         box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.06) !important;
-        overflow-y: auto !important;
-        resize: vertical !important;
+    }
+
+    .results-pane pre {
+        background: rgba(15, 23, 42, 0.88) !important;
+        border-radius: 10px !important;
+        padding: 12px !important;
+        border: 1px solid rgba(148, 163, 184, 0.14) !important;
+        font-size: 0.82rem !important;
+    }
+
+    .results-pane code {
+        font-family: 'SF Mono', Monaco, 'Courier New', monospace !important;
     }
 
     /* About accordion */
@@ -617,8 +680,7 @@ def main():
             border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important;
         }
 
-        #output-results textarea {
-            height: clamp(180px, 40vh, 280px) !important;
+        .results-pane {
             min-height: 180px !important;
             max-height: 300px !important;
         }
@@ -748,26 +810,38 @@ Do not deploy with real student data without implementing:
 
             # RIGHT COLUMN - Output side
             with gr.Column(elem_classes=["right-column"], scale=2):
-                output = gr.Textbox(
-                    label="Results",
-                    lines=8,
-                    show_copy_button=True,
-                    elem_id="output-results",
-                    interactive=False
-                )
+                with gr.Tabs(elem_classes=["results-tabs"]):
+                    with gr.TabItem("Answer"):
+                        answer_output = gr.Markdown(
+                            "Ask a question to see the AI's explanation.",
+                            elem_classes=["results-pane"],
+                            elem_id="answer-pane"
+                        )
+                    with gr.TabItem("SQL Details"):
+                        sql_output = gr.Markdown(
+                            "SQL code and preview will appear here after you submit a question.",
+                            elem_classes=["results-pane"],
+                            elem_id="sql-pane"
+                        )
+                    with gr.TabItem("Python Details"):
+                        python_output = gr.Markdown(
+                            "Python analysis will appear here after you submit a question.",
+                            elem_classes=["results-pane"],
+                            elem_id="python-pane"
+                        )
 
         # Connect the submit button
         submit_btn.click(
             fn=ai_assistant,
             inputs=[question_input, api_key_input],
-            outputs=output
+            outputs=[answer_output, sql_output, python_output]
         )
 
         # Also allow Enter key to submit (Enter will submit the form; multiline will use Shift+Enter for newline)
         question_input.submit(
             fn=ai_assistant,
             inputs=[question_input, api_key_input],
-            outputs=output
+            outputs=[answer_output, sql_output, python_output]
         )
 
         # Connect example buttons to populate the question input using gr.update which is robust across gradio versions
