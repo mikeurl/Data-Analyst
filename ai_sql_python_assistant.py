@@ -375,12 +375,30 @@ def main():
     }
 
     /* Base styling */
+    html, body {
+        height: 100%;
+        margin: 0;
+        background: #0b1120 !important;
+    }
+
     .gradio-container {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
         background: #0b1120 !important;
         color: #e2e8f0 !important;
         padding: 0 !important;
         max-width: 100% !important;
+        min-height: 100vh !important;
+        height: 100vh !important;
+        overflow: hidden !important;
+    }
+
+    .gradio-container > .gr-blocks,
+    .gradio-container .gr-blocks {
+        height: 100% !important;
+    }
+
+    .gradio-container * {
+        color: inherit;
     }
 
     .gradio-container * {
@@ -392,7 +410,9 @@ def main():
         display: grid !important;
         grid-template-columns: 420px 1fr !important;
         gap: 0 !important;
-        min-height: 100vh !important;
+        height: 100% !important;
+        min-height: 100% !important;
+        align-items: stretch !important;
         background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(8, 47, 73, 0.9)) !important;
     }
 
@@ -404,6 +424,8 @@ def main():
         overflow-y: auto !important;
         display: flex !important;
         flex-direction: column !important;
+        height: 100% !important;
+        max-height: 100% !important;
         backdrop-filter: blur(12px);
     }
 
@@ -412,6 +434,8 @@ def main():
         background: rgba(9, 17, 31, 0.82) !important;
         padding: 36px 32px !important;
         overflow-y: auto !important;
+        height: 100% !important;
+        max-height: 100% !important;
     }
 
     /* Header */
@@ -423,7 +447,7 @@ def main():
     }
 
     .header-section img {
-        max-width: 48px !important;
+        max-width: 60px !important;
         height: auto !important;
         margin: 0 auto 12px auto !important;
         filter: drop-shadow(0 8px 12px rgba(15, 23, 42, 0.45));
@@ -515,7 +539,7 @@ def main():
         transition: transform 0.2s ease, box-shadow 0.2s ease !important;
         box-shadow: 0 12px 22px -12px rgba(99, 102, 241, 0.7) !important;
         width: 100% !important;
-        margin: 22px 0 !important;
+        margin: 16px 0 20px 0 !important;
     }
 
     button[variant="primary"]:hover {
@@ -599,7 +623,7 @@ def main():
 
     .results-pane {
         background: rgba(10, 19, 35, 0.9) !important;
-        border: 1px solid rgba(148, 163, 184, 0.16) !important;
+        border: 1px solid rgba(59, 130, 246, 0.45) !important;
         border-radius: 14px !important;
         padding: 20px !important;
         min-height: 200px !important;
@@ -630,7 +654,6 @@ def main():
         border-radius: 12px !important;
         padding: 16px !important;
         margin-top: auto !important;
-        margin-top: 24px !important;
         box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.04) !important;
     }
 
@@ -671,18 +694,32 @@ def main():
 
     /* Responsive - stack on small screens */
     @media (max-width: 1024px) {
+        .gradio-container {
+            height: auto !important;
+            overflow: auto !important;
+        }
+
         .two-column-container {
             grid-template-columns: 1fr !important;
+            height: auto !important;
+            min-height: auto !important;
         }
 
         .left-column {
             border-right: none !important;
             border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important;
+            height: auto !important;
+            max-height: none !important;
         }
 
         .results-pane {
             min-height: 180px !important;
             max-height: 300px !important;
+        }
+
+        .right-column {
+            height: auto !important;
+            max-height: none !important;
         }
     }
     """
@@ -707,9 +744,8 @@ def main():
                 gr.HTML("""
                     <div class="header-section">
                         <img src="https://raw.githubusercontent.com/mikeurl/Data-Analyst/claude/review-repo-structure-011CUqm6vjgy43VX5NmComtm/docs/logo.png"
-                             alt="Singulier Oblige">
+                             alt="Higher Education AI Analyst">
                         <h1>Higher Education AI Analyst</h1>
-                        <p>by Singulier Oblige</p>
                     </div>
                 """)
 
@@ -721,6 +757,12 @@ def main():
                     elem_id="question-input",
                     interactive=True,
                     show_label=False
+                )
+
+                # Submit button
+                submit_btn = gr.Button(
+                    "Send",
+                    variant="primary"
                 )
 
                 # Example prompts
@@ -737,12 +779,6 @@ def main():
                         example3 = gr.Button("Graduation Statistics", size="sm")
                     with gr.Column(scale=1, elem_classes=["example-button"]):
                         example4 = gr.Button("Enrollment Distribution", size="sm")
-
-                # Submit button
-                submit_btn = gr.Button(
-                    "Send",
-                    variant="primary"
-                )
 
                 # API key section
                 gr.HTML('<div class="api-section">')
