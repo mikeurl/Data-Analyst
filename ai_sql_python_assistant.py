@@ -28,6 +28,10 @@ import sys
 from openai import OpenAI
 import gradio as gr
 import pandas as pd
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 try:
     import matplotlib
