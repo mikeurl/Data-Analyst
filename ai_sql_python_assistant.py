@@ -365,19 +365,46 @@ AVAILABLE LIBRARIES (already imported as 'pd'):
 - scipy - for scientific computing (import as needed)
 - scikit-learn (sklearn) - for machine learning (import as needed)
 
-IMPORTANT:
+IMPORTANT DATA PREPARATION:
+- Check column data types BEFORE analysis
+- Convert categorical/string columns to numeric using pd.get_dummies() or label encoding
+- Handle missing values (dropna() or fillna())
+- Ensure numeric columns are float/int types before regression
+- For regression: use pd.get_dummies() for categorical variables
+
+IMPORTANT OUTPUT:
 - The DataFrame 'df' and pandas module 'pd' are already available
 - For other libraries, include the import statement in your code
 - Store final output in a variable named 'result'
 - Return ONLY the code (no triple backticks, no markdown)
 - Make 'result' a readable string or formatted output, not just a model object
 
-Example for regression:
+Example for regression with categorical variables:
 import statsmodels.api as sm
-X = df[['column1', 'column2']]
-y = df['target']
+
+# Prepare data - convert categoricals to dummies
+df_analysis = df.copy()
+categorical_cols = df_analysis.select_dtypes(include=['object']).columns.tolist()
+if categorical_cols:
+    df_analysis = pd.get_dummies(df_analysis, columns=categorical_cols, drop_first=True)
+
+# Handle missing values
+df_analysis = df_analysis.dropna()
+
+# Select features and target
+feature_cols = [col for col in df_analysis.columns if col != 'target_column']
+X = df_analysis[feature_cols]
+y = df_analysis['target_column']
+
+# Run regression
 model = sm.OLS(y, sm.add_constant(X)).fit()
 result = model.summary().as_text()
+
+Example for simple statistics (no statsmodels needed):
+# Calculate correlation matrix
+numeric_cols = df.select_dtypes(include=['number']).columns
+correlation = df[numeric_cols].corr()
+result = correlation.to_string()
 """
     response = client.chat.completions.create(
         model="gpt-4o",
