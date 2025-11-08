@@ -26,6 +26,41 @@ import sys
 from openai import OpenAI
 import gradio as gr
 import pandas as pd
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+try:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+except ImportError:  # pragma: no cover - optional dependency in some deployments
+    matplotlib = None
+    plt = None
+
+matplotlib = None
+plt = None
+
+
+def ensure_matplotlib():
+    """Lazy-load matplotlib only when charting is required."""
+
+    global matplotlib, plt
+
+    if matplotlib is not None and plt is not None:
+        return True
+
+    try:
+        matplotlib = importlib.import_module("matplotlib")
+        matplotlib.use("Agg")
+        plt = importlib.import_module("matplotlib.pyplot")
+        return True
+    except ImportError:  # pragma: no cover - optional dependency in some deployments
+        matplotlib = None
+        plt = None
+        return False
 
 # Import database setup functions for auto-initialization
 from create_ipeds_db_schema import create_ipeds_db_schema
