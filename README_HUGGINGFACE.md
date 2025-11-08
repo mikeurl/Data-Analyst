@@ -20,6 +20,20 @@ Ask questions about higher education data in natural language. This tool uses AI
 3. **Ask a question** in natural language about student data
 4. **View the analysis** - see the SQL generated, the data results, and the AI explanation
 
+## Deploying on Hugging Face Spaces
+
+Hugging Face provides a secure secrets store so you never need to hard-code an API key in the repository.
+
+1. Open your Space, go to **Settings → Secrets**, and add a new secret named `OPENAI_API_KEY` with your key value.
+2. Redeploy or restart the Space. The secret is exposed to the app as an environment variable, so the assistant can pick it up automatically.
+3. (Optional) Keep the on-page API key input enabled. Visitors without their own key can paste one for the current session; it is not persisted after the tab closes.
+
+Avoid embedding API keys directly in source files or the Space config. Secrets keep the key off the public repo history and allow you to rotate or revoke it without shipping code changes.
+
+### Confirming the deployed build
+
+After you update your Space, refresh the app and look at the "Higher Education AI Analyst" header. The blue build tag (for example, `build-20250130-01`) reflects the exact revision currently running. If the tag on the live app does not match the commit you expect, trigger a manual restart from the Space settings to pull the latest code.
+
 ## Example Questions
 
 - "What are the retention rates by race and ethnicity?"

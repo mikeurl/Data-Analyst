@@ -17,6 +17,7 @@ inputs and in controlled environments. Not recommended for production use withou
 additional security measures.
 """
 
+import json
 import os
 import re
 import sqlite3
@@ -35,6 +36,7 @@ from SyntheticDataforSchema2 import generate_stable_population_data
 ###############################################################################
 
 DB_PATH = "ipeds_data.db"  # Path to your SQLite DB file.
+APP_BUILD_TAG = "build-20250130-01"
 
 # Get OpenAI API key from environment variable - will create client when needed
 DEFAULT_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -127,6 +129,23 @@ def remove_python_fences(py_text):
     else:
         return py_text.replace("```", "").strip()
 
+def is_destructive_sql(sql_code):
+    """Return True if the SQL code appears to perform a destructive operation."""
+    normalized = re.sub(r"\s+", " ", sql_code).strip().lower()
+    destructive_keywords = [
+        "drop ", "delete ", "truncate ", "alter ", "update ", "insert ",
+        "replace ", "create table", "attach ", "detach ", "pragma "
+    ]
+    if any(keyword in normalized for keyword in destructive_keywords):
+        return True
+
+    # Block multi-statement queries
+    if normalized.count(";") > 1:
+        return True
+
+    return False
+
+
 def run_sql(sql_query):
     """
     Executes the given SQL query against DB_PATH and returns a pandas DataFrame.
@@ -176,7 +195,12 @@ Below is the current schema:
 The user wants the following:
 {user_question}
 
-Please provide ONLY the SQL code, no triple backticks. End with a semicolon.
+Important safety requirements:
+- Return a single, read-only SELECT statement.
+- Never modify data (no INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, TRUNCATE, PRAGMA, ATTACH, DETACH, or other side effects).
+- Do not include comments or explanations.
+
+Provide ONLY the SQL code, no triple backticks, ending with a semicolon.
 """
     response = client.chat.completions.create(
         model="gpt-4o",
@@ -207,10 +231,12 @@ Store final output in a variable named 'result'. Return ONLY the code (no triple
     )
     return response.choices[0].message.content
 
-def ask_gpt_for_explanation(sql_code, sql_result_str, py_code, py_result_str, client):
+def ask_gpt_for_explanation(sql_code, sql_result_str, py_code, py_result_str, client, python_used, plan):
     """
     Combine everything into a final explanation for the user.
     """
+    python_status = "executed" if python_used else "skipped as unnecessary"
+    plan_reason = plan.get("reason", "No additional context provided.")
     prompt = f"""
 We had the following steps:
 
@@ -220,13 +246,16 @@ We had the following steps:
 2) Output from the SQL (or error):
 {sql_result_str}
 
-3) Python code:
+3) Python code ({python_status}):
 {py_code}
 
-4) Output from the Python code (or error):
+4) Output from the Python code (or explanation of why it was skipped):
 {py_result_str}
 
-Provide a concise, friendly explanation of these results for the user.
+Python analysis decision rationale:
+{plan_reason}
+
+Provide a concise, friendly explanation of these results for the user. Highlight key findings and reference any tables or visual summaries included in the response.
 """
     response = client.chat.completions.create(
         model="gpt-4o",
@@ -235,6 +264,64 @@ Provide a concise, friendly explanation of these results for the user.
     )
     return response.choices[0].message.content
 
+
+def determine_analysis_plan(user_question, df_preview, client):
+    """Ask GPT whether Python analysis is necessary and which presentation to favor."""
+    plan_prompt = f"""
+You evaluate whether a pandas DataFrame returned from a SQL query needs additional Python analysis.
+
+Question: {user_question}
+SQL preview:\n{df_preview}
+
+Decide if Python (e.g., advanced statistics, regressions, complex reshaping) is required beyond SQL.
+Respond strictly in JSON with keys:
+  requires_python: boolean
+  reason: short string explaining your decision
+  recommended_presentation: one of ["narrative", "table"]
+
+Prefer a table when structured data helps the explanation; otherwise provide a narrative summary.
+If the preview is empty, set requires_python to false.
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "system", "content": plan_prompt}],
+            temperature=0.0
+        )
+        content = response.choices[0].message.content.strip()
+        if content.startswith("```"):
+            fenced_match = re.search(r"```(?:json)?\n(.*?)\n```", content, re.DOTALL)
+            if fenced_match:
+                content = fenced_match.group(1).strip()
+        plan = json.loads(content)
+        requires_python = bool(plan.get("requires_python", False))
+        presentation = plan.get("recommended_presentation", "table")
+        reason = plan.get("reason", "")
+        return {
+            "requires_python": requires_python,
+            "recommended_presentation": presentation,
+            "reason": reason,
+        }
+    except Exception:
+        return {
+            "requires_python": False,
+            "recommended_presentation": "table",
+            "reason": "Defaulted to safe presentation; automated planning was unavailable.",
+        }
+
+
+def dataframe_to_markdown(df, max_rows=20):
+    """Convert a DataFrame preview to Markdown, limiting the number of rows."""
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return "No rows returned from the SQL query."
+    preview_df = df.head(max_rows)
+    try:
+        return preview_df.to_markdown(index=False)
+    except Exception:
+        return preview_df.to_string(index=False)
+
+
 ###############################################################################
 # 5. GRADIO INTERFACE
 ###############################################################################
@@ -242,16 +329,17 @@ Provide a concise, friendly explanation of these results for the user.
 def ai_assistant(user_input, api_key_input):
     """
     1) GPT -> SQL code (fenced or unfenced).
-    2) Remove fences, run the query.
-    3) GPT -> Python code, remove fences, run the code.
-    4) GPT -> final explanation.
+    2) Remove fences, validate for safety, run the query.
+    3) Plan presentation and decide whether Python analysis is necessary.
+    4) Optionally run GPT-generated Python code when required.
+    5) GPT -> final explanation enriched with tables or visuals when possible.
     """
     # Use the API key from input if provided, otherwise use the default one
     active_api_key = api_key_input.strip() if api_key_input and api_key_input.strip() else DEFAULT_API_KEY
 
     # Check if API key is set
     if not active_api_key:
-        return """
+        message = """
 ❌ OpenAI API Key Not Set
 
 To use this AI assistant, you need to set your OpenAI API key.
@@ -265,6 +353,7 @@ Steps to get started:
 
 For more information, see the README.md file.
 """
+        return message, "Awaiting a valid API key to generate SQL details.", "Awaiting a valid API key to generate Python details."
 
     # Create OpenAI client with the API key
     client = OpenAI(api_key=active_api_key)
@@ -274,14 +363,33 @@ For more information, see the README.md file.
     # Clean out triple backticks or ```sql
     sql_code_clean = remove_sql_fences(raw_sql_code)
 
+    if is_destructive_sql(sql_code_clean):
+        warning_message = (
+            "The generated SQL was blocked because it might modify the database. "
+            "Only read-only SELECT statements are allowed. Please rephrase your question."
+        )
+        sql_details = (
+            "### Generated SQL (Blocked)\n"
+            f"```sql\n{sql_code_clean}\n```\n\n"
+            "### Reason\n"
+            "Potentially destructive SQL statements are not permitted."
+        )
+        return warning_message, sql_details, "Python analysis was skipped because the SQL step was blocked."
+
     # Execute
     df_or_error = run_sql(sql_code_clean)
     if isinstance(df_or_error, str) and df_or_error.startswith("SQL Error:"):
         # The SQL failed
-        explanation = f"SQL query failed:\n{df_or_error}\n\nSQL was:\n{sql_code_clean}"
-        return explanation
+        explanation = f"SQL query failed. Please review the SQL details tab for more information.\n\n{df_or_error}"
+        sql_details = (
+            "### Generated SQL\n"
+            f"```sql\n{sql_code_clean}\n```\n\n"
+            "### Error\n"
+            f"{df_or_error}"
+        )
+        return explanation, sql_details, "Python analysis was not executed because the SQL step failed."
 
-    # Build a short preview of the DataFrame
+    # Build previews and plan presentation
     if isinstance(df_or_error, pd.DataFrame):
         preview = df_or_error.head().to_string(index=False)
         cols_list = df_or_error.columns.tolist()
@@ -289,11 +397,21 @@ For more information, see the README.md file.
     else:
         df_preview_str = str(df_or_error)
 
-    # Step B: GPT for Python
-    raw_py_code = ask_gpt_for_python(user_input, df_preview_str, client)
-    py_code_clean = remove_python_fences(raw_py_code)
+    plan = determine_analysis_plan(user_input, df_preview_str, client)
+    requires_python = plan.get("requires_python", False)
 
-    py_result = run_python_code(py_code_clean, df_or_error)
+    table_markdown = dataframe_to_markdown(df_or_error)
+
+    # Step B: GPT for Python (conditional)
+    python_used = False
+    if requires_python:
+        raw_py_code = ask_gpt_for_python(user_input, df_preview_str, client)
+        py_code_clean = remove_python_fences(raw_py_code)
+        py_result = run_python_code(py_code_clean, df_or_error)
+        python_used = True
+    else:
+        py_code_clean = "# Python analysis was not required for this question."
+        py_result = "Python analysis was skipped based on the planning step."
 
     # Step C: GPT final explanation
     final_explanation = ask_gpt_for_explanation(
@@ -301,16 +419,47 @@ For more information, see the README.md file.
         df_preview_str,
         py_code_clean,
         py_result,
-        client
+        client,
+        python_used,
+        plan,
     )
 
-    return (
-        f"[SQL CODE]\n{sql_code_clean}\n\n"
-        f"[SQL RESULT PREVIEW]\n{df_preview_str}\n\n"
-        f"[PYTHON CODE]\n{py_code_clean}\n\n"
-        f"[PYTHON RESULT]\n{py_result}\n\n"
-        f"[GPT EXPLANATION]\n{final_explanation}"
+    summary_sections = [
+        "### Your Question\n" + f"{user_input}",
+        "### Assistant Explanation\n" + f"{final_explanation}",
+    ]
+
+    if plan.get("recommended_presentation") == "table" and table_markdown:
+        summary_sections.append("### Result Snapshot\n" + table_markdown)
+
+    summary_tab = "\n\n".join(summary_sections)
+
+    sql_tab = (
+        "### Generated SQL\n"
+        f"```sql\n{sql_code_clean}\n```\n\n"
+        "### SQL Result Preview\n"
+        f"```\n{df_preview_str}\n```\n\n"
+        "### Presentation Plan\n"
+        f"- Python required: {'Yes' if requires_python else 'No'}\n"
+        f"- Recommended view: {plan.get('recommended_presentation', 'table')}\n"
+        f"- Rationale: {plan.get('reason', 'Not provided')}"
     )
+
+    if python_used:
+        python_output_section = (
+            "### Python Analysis Code\n"
+            f"```python\n{py_code_clean}\n```\n\n"
+            "### Python Output\n"
+            f"```\n{py_result}\n```"
+        )
+    else:
+        python_output_section = (
+            "### Python Analysis\n"
+            "Python execution was skipped because the SQL result fully answered the question."
+            f"\n\n**Reason:** {plan.get('reason', 'No additional rationale provided.')}"
+        )
+
+    return summary_tab, sql_tab, python_output_section
 
 def main():
     """Launch the Gradio web interface for the AI assistant."""
@@ -342,43 +491,76 @@ def main():
     print(f"\nStarting Higher Education AI Analyst...")
     print(f"Using database: {DB_PATH}")
     print(f"OpenAI Model: gpt-4o")
+    print(f"Build Tag: {APP_BUILD_TAG}")
+    print("Charting backend: disabled (tables-only previews)")
     print("\nLaunching Gradio interface...")
 
     # Two-column layout with ChatGPT styling
     custom_css = """
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
+    :root {
+        color-scheme: dark;
+    }
+
     /* Base styling */
+    html, body {
+        height: 100%;
+        margin: 0;
+        background: #0b1120 !important;
+    }
+
     .gradio-container {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
-        background: #f9fafb !important;
+        background: #0b1120 !important;
+        color: #e2e8f0 !important;
         padding: 0 !important;
         max-width: 100% !important;
+        min-height: 100vh !important;
+        height: 100vh !important;
+        overflow: hidden !important;
+    }
+
+    .gradio-container > .gr-blocks,
+    .gradio-container .gr-blocks {
+        height: 100% !important;
+    }
+
+    .gradio-container * {
+        color: inherit;
     }
 
     /* Two-column layout */
     .two-column-container {
         display: grid !important;
-        grid-template-columns: 450px 1fr !important;
+        grid-template-columns: 420px 1fr !important;
         gap: 0 !important;
-        min-height: 100vh !important;
+        height: 100% !important;
+        min-height: 100% !important;
+        align-items: stretch !important;
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(8, 47, 73, 0.9)) !important;
     }
 
     /* Left column - input side */
     .left-column {
-        background: white !important;
-        border-right: 1px solid #e5e7eb !important;
-        padding: 32px 24px !important;
+        background: rgba(17, 24, 39, 0.88) !important;
+        border-right: 1px solid rgba(148, 163, 184, 0.12) !important;
+        padding: 32px 28px !important;
         overflow-y: auto !important;
         display: flex !important;
         flex-direction: column !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        backdrop-filter: blur(12px);
     }
 
     /* Right column - output side */
     .right-column {
-        background: #f9fafb !important;
-        padding: 32px 24px !important;
+        background: rgba(9, 17, 31, 0.82) !important;
+        padding: 36px 32px !important;
         overflow-y: auto !important;
+        height: 100% !important;
+        max-height: 100% !important;
     }
 
     /* Header */
@@ -386,140 +568,151 @@ def main():
         text-align: center !important;
         margin-bottom: 32px !important;
         padding-bottom: 24px !important;
-        border-bottom: 1px solid #f3f4f6 !important;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.18) !important;
     }
 
     .header-section img {
-        max-width: 48px !important;
+        max-width: 60px !important;
         height: auto !important;
         margin: 0 auto 12px auto !important;
-        opacity: 0.9 !important;
+        filter: drop-shadow(0 8px 12px rgba(15, 23, 42, 0.45));
     }
 
     .header-section h1 {
-        font-size: 1.25rem !important;
+        font-size: 1.35rem !important;
         font-weight: 600 !important;
-        color: #111827 !important;
+        color: #f8fafc !important;
         margin: 0 0 4px 0 !important;
     }
 
     .header-section p {
-        font-size: 0.875rem !important;
-        color: #6b7280 !important;
+        font-size: 0.85rem !important;
+        color: #94a3b8 !important;
         margin: 0 !important;
+        letter-spacing: 0.08em !important;
+        text-transform: uppercase !important;
+    }
+
+    .header-section .build-tag {
+        font-size: 0.7rem !important;
+        color: #38bdf8 !important;
+        margin-top: 6px !important;
+        letter-spacing: 0.12em !important;
     }
 
     /* Question input */
     #question-input textarea {
-        background: white !important;
-        border: 1px solid #d1d5db !important;
-        border-radius: 12px !important;
-        color: #111827 !important;
+        background: rgba(15, 23, 42, 0.9) !important;
+        border: 1px solid rgba(148, 163, 184, 0.28) !important;
+        border-radius: 16px !important;
+        color: #f8fafc !important;
         font-size: 1rem !important;
-        padding: 16px !important;
+        padding: 18px 16px !important;
         min-height: 140px !important;
         resize: vertical !important;
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
-        transition: border-color 0.15s ease !important;
+        box-shadow: inset 0 1px 0 0 rgba(148, 163, 184, 0.05) !important;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
     }
 
     #question-input textarea:focus {
-        border-color: #10a37f !important;
+        border-color: #38bdf8 !important;
         outline: none !important;
-        box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1) !important;
+        box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2) !important;
     }
 
     /* Example buttons */
     .examples-label {
         font-size: 0.75rem !important;
         font-weight: 500 !important;
-        color: #6b7280 !important;
+        color: #94a3b8 !important;
         text-transform: uppercase !important;
-        letter-spacing: 0.05em !important;
-        margin: 20px 0 12px 0 !important;
+        letter-spacing: 0.08em !important;
+        margin: 24px 0 12px 0 !important;
     }
 
     .example-row {
         display: grid !important;
         grid-template-columns: 1fr 1fr !important;
-        gap: 8px !important;
-        margin-bottom: 20px !important;
+        gap: 10px !important;
+        margin-bottom: 18px !important;
     }
 
     .example-button button {
-        background: #f9fafb !important;
-        border: 1px solid #e5e7eb !important;
-        border-radius: 8px !important;
-        padding: 10px 14px !important;
-        font-size: 0.875rem !important;
-        color: #374151 !important;
+        background: rgba(30, 41, 59, 0.72) !important;
+        border: 1px solid rgba(148, 163, 184, 0.16) !important;
+        border-radius: 10px !important;
+        padding: 12px 14px !important;
+        font-size: 0.85rem !important;
+        color: #e2e8f0 !important;
         cursor: pointer !important;
-        transition: all 0.15s ease !important;
+        transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease !important;
         text-align: center !important;
         font-weight: 400 !important;
         width: 100% !important;
     }
 
     .example-button button:hover {
-        background: white !important;
-        border-color: #10a37f !important;
-        color: #111827 !important;
+        background: rgba(59, 130, 246, 0.18) !important;
+        border-color: rgba(59, 130, 246, 0.45) !important;
+        box-shadow: 0 10px 22px -15px rgba(59, 130, 246, 0.6) !important;
+        transform: translateY(-1px);
     }
 
     /* Submit button */
     button[variant="primary"] {
-        background: #10a37f !important;
+        background: linear-gradient(135deg, #6366f1, #38bdf8) !important;
         color: white !important;
         font-weight: 500 !important;
-        font-size: 0.875rem !important;
+        font-size: 0.9rem !important;
         padding: 12px 24px !important;
-        border-radius: 8px !important;
+        border-radius: 10px !important;
         border: none !important;
         cursor: pointer !important;
-        transition: all 0.15s ease !important;
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+        transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+        box-shadow: 0 12px 22px -12px rgba(99, 102, 241, 0.7) !important;
         width: 100% !important;
-        margin: 20px 0 !important;
+        margin: 16px 0 20px 0 !important;
     }
 
     button[variant="primary"]:hover {
-        background: #0d8f6f !important;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+        transform: translateY(-1px);
+        box-shadow: 0 16px 28px -14px rgba(59, 130, 246, 0.75) !important;
     }
 
     /* API key section */
     .api-section {
-        background: #f9fafb !important;
-        border: 1px solid #e5e7eb !important;
-        border-radius: 8px !important;
-        padding: 16px !important;
+        background: rgba(15, 23, 42, 0.8) !important;
+        border: 1px solid rgba(148, 163, 184, 0.12) !important;
+        border-radius: 12px !important;
+        padding: 18px !important;
         margin: 20px 0 !important;
+        box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.05) !important;
     }
 
     #api-key-input input {
-        background: white !important;
-        border: 1px solid #d1d5db !important;
-        border-radius: 6px !important;
-        color: #111827 !important;
-        font-size: 0.875rem !important;
-        padding: 10px 12px !important;
+        background: rgba(15, 23, 42, 0.9) !important;
+        border: 1px solid rgba(148, 163, 184, 0.2) !important;
+        border-radius: 8px !important;
+        color: #e0f2fe !important;
+        font-size: 0.85rem !important;
+        padding: 12px 14px !important;
         font-family: 'SF Mono', Monaco, monospace !important;
     }
 
     #api-key-input input:focus {
-        border-color: #10a37f !important;
+        border-color: rgba(56, 189, 248, 0.6) !important;
         outline: none !important;
-        box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1) !important;
+        box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2) !important;
     }
 
     .api-info {
         font-size: 0.75rem !important;
-        color: #6b7280 !important;
-        margin-top: 8px !important;
+        color: #94a3b8 !important;
+        margin-top: 10px !important;
     }
 
     .api-info a {
-        color: #10a37f !important;
+        color: #38bdf8 !important;
         text-decoration: none !important;
     }
 
@@ -528,61 +721,105 @@ def main():
     }
 
     /* Output results */
-    #output-results {
-        height: calc(100vh - 64px) !important;
+    .results-tabs {
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        box-shadow: none !important;
     }
 
-    #output-results textarea {
-        background: white !important;
-        border: 1px solid #d1d5db !important;
-        border-radius: 12px !important;
-        padding: 16px !important;
-        min-height: calc(100vh - 120px) !important;
+    .results-tabs .tab-nav {
+        gap: 8px !important;
+        border: none !important;
+        padding: 0 4px 12px 4px !important;
+        background: transparent !important;
+    }
+
+    .results-tabs .tab-nav button {
+        background: rgba(15, 23, 42, 0.6) !important;
+        border: 1px solid rgba(148, 163, 184, 0.18) !important;
+        border-radius: 10px !important;
+        padding: 8px 16px !important;
+        font-size: 0.85rem !important;
+        color: #cbd5f5 !important;
+        transition: background 0.2s ease, border-color 0.2s ease !important;
+    }
+
+    .results-tabs .tab-nav button[aria-selected="true"] {
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.22), rgba(56, 189, 248, 0.18)) !important;
+        border-color: rgba(56, 189, 248, 0.5) !important;
+        color: #e2e8f0 !important;
+    }
+
+    .results-tabs .tab-panels {
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+    }
+
+    .results-pane {
+        background: rgba(10, 19, 35, 0.9) !important;
+        border: 1px solid rgba(59, 130, 246, 0.45) !important;
+        border-radius: 14px !important;
+        padding: 20px !important;
+        min-height: 200px !important;
+        font-size: 0.9rem !important;
+        line-height: 1.55 !important;
+        color: #f8fafc !important;
+        box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.06) !important;
+        overflow: visible !important;
+    }
+
+    .results-pane pre {
+        background: rgba(15, 23, 42, 0.88) !important;
+        border-radius: 10px !important;
+        padding: 12px !important;
+        border: 1px solid rgba(148, 163, 184, 0.14) !important;
+        font-size: 0.82rem !important;
+    }
+
+    .results-pane code {
         font-family: 'SF Mono', Monaco, 'Courier New', monospace !important;
-        font-size: 0.875rem !important;
-        line-height: 1.6 !important;
-        color: #111827 !important;
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
     }
 
     /* About accordion */
     details {
-        background: #f9fafb !important;
-        border: 1px solid #e5e7eb !important;
-        border-radius: 8px !important;
-        padding: 12px !important;
+        background: rgba(30, 41, 59, 0.72) !important;
+        border: 1px solid rgba(148, 163, 184, 0.12) !important;
+        border-radius: 12px !important;
+        padding: 16px !important;
         margin-top: auto !important;
-        margin-top: 24px !important;
+        box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.04) !important;
     }
 
     summary {
         font-weight: 500 !important;
-        font-size: 0.875rem !important;
-        color: #374151 !important;
+        font-size: 0.9rem !important;
+        color: #cbd5f5 !important;
         cursor: pointer !important;
     }
 
     details[open] summary {
         margin-bottom: 12px !important;
         padding-bottom: 12px !important;
-        border-bottom: 1px solid #e5e7eb !important;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.18) !important;
     }
 
     details p, details li {
-        color: #4b5563 !important;
+        color: #cbd5f5 !important;
         line-height: 1.6 !important;
-        font-size: 0.875rem !important;
+        font-size: 0.85rem !important;
     }
 
     details h3 {
-        color: #111827 !important;
-        font-size: 0.875rem !important;
+        color: #e0f2fe !important;
+        font-size: 0.9rem !important;
         font-weight: 600 !important;
         margin: 12px 0 6px 0 !important;
     }
 
     details a {
-        color: #10a37f !important;
+        color: #38bdf8 !important;
         text-decoration: none !important;
     }
 
@@ -592,17 +829,32 @@ def main():
 
     /* Responsive - stack on small screens */
     @media (max-width: 1024px) {
+        .gradio-container {
+            height: auto !important;
+            overflow: auto !important;
+        }
+
         .two-column-container {
             grid-template-columns: 1fr !important;
+            height: auto !important;
+            min-height: auto !important;
         }
 
         .left-column {
             border-right: none !important;
-            border-bottom: 1px solid #e5e7eb !important;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important;
+            height: auto !important;
+            max-height: none !important;
         }
 
-        #output-results textarea {
-            min-height: 400px !important;
+        .results-pane {
+            min-height: 180px !important;
+            max-height: 300px !important;
+        }
+
+        .right-column {
+            height: auto !important;
+            max-height: none !important;
         }
     }
     """
@@ -624,12 +876,12 @@ def main():
             # LEFT COLUMN - Input side
             with gr.Column(elem_classes=["left-column"], scale=1):
                 # Header
-                gr.HTML("""
+                gr.HTML(f"""
                     <div class="header-section">
                         <img src="https://raw.githubusercontent.com/mikeurl/Data-Analyst/claude/review-repo-structure-011CUqm6vjgy43VX5NmComtm/docs/logo.png"
-                             alt="Singulier Oblige">
+                             alt="Higher Education AI Analyst">
                         <h1>Higher Education AI Analyst</h1>
-                        <p>by Singulier Oblige</p>
+                        <p class="build-tag">{APP_BUILD_TAG}</p>
                     </div>
                 """)
 
@@ -641,6 +893,12 @@ def main():
                     elem_id="question-input",
                     interactive=True,
                     show_label=False
+                )
+
+                # Submit button
+                submit_btn = gr.Button(
+                    "Send",
+                    variant="primary"
                 )
 
                 # Example prompts
@@ -657,12 +915,6 @@ def main():
                         example3 = gr.Button("Graduation Statistics", size="sm")
                     with gr.Column(scale=1, elem_classes=["example-button"]):
                         example4 = gr.Button("Enrollment Distribution", size="sm")
-
-                # Submit button
-                submit_btn = gr.Button(
-                    "Send",
-                    variant="primary"
-                )
 
                 # API key section
                 gr.HTML('<div class="api-section">')
@@ -730,26 +982,38 @@ Do not deploy with real student data without implementing:
 
             # RIGHT COLUMN - Output side
             with gr.Column(elem_classes=["right-column"], scale=2):
-                output = gr.Textbox(
-                    label="Results",
-                    lines=30,
-                    show_copy_button=True,
-                    elem_id="output-results",
-                    interactive=False
-                )
+                with gr.Tabs(elem_classes=["results-tabs"]):
+                    with gr.TabItem("Answer"):
+                        answer_output = gr.Markdown(
+                            "Ask a question to see the AI's explanation.",
+                            elem_classes=["results-pane"],
+                            elem_id="answer-pane"
+                        )
+                    with gr.TabItem("SQL Details"):
+                        sql_output = gr.Markdown(
+                            "SQL code and preview will appear here after you submit a question.",
+                            elem_classes=["results-pane"],
+                            elem_id="sql-pane"
+                        )
+                    with gr.TabItem("Python Details"):
+                        python_output = gr.Markdown(
+                            "Python analysis will appear here after you submit a question.",
+                            elem_classes=["results-pane"],
+                            elem_id="python-pane"
+                        )
 
         # Connect the submit button
         submit_btn.click(
             fn=ai_assistant,
             inputs=[question_input, api_key_input],
-            outputs=output
+            outputs=[answer_output, sql_output, python_output]
         )
 
         # Also allow Enter key to submit (Enter will submit the form; multiline will use Shift+Enter for newline)
         question_input.submit(
             fn=ai_assistant,
             inputs=[question_input, api_key_input],
-            outputs=output
+            outputs=[answer_output, sql_output, python_output]
         )
 
         # Connect example buttons to populate the question input using gr.update which is robust across gradio versions
