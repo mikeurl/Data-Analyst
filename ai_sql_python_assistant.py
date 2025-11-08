@@ -17,9 +17,6 @@ inputs and in controlled environments. Not recommended for production use withou
 additional security measures.
 """
 
-import base64
-import importlib
-import io
 import json
 import os
 import re
@@ -360,59 +357,13 @@ def dataframe_to_markdown(df, max_rows=20):
 
 
 def generate_quick_chart(df):
-    """Create a simple chart encoded as a Markdown image when data supports it."""
-    if not ensure_matplotlib() or df is None or not isinstance(df, pd.DataFrame) or df.empty:
+    """Placeholder for quick chart generation; returns None when unavailable."""
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
         return None
 
-    df_numeric = df.select_dtypes(include="number")
-    if df_numeric.empty:
-        return None
-
-    numeric_cols = list(df_numeric.columns)
-    x_col = None
-    y_col = numeric_cols[0]
-
-    for col in df.columns:
-        if col != y_col:
-            x_col = col
-            break
-
-    if not x_col:
-        if len(numeric_cols) > 1:
-            x_col = numeric_cols[1]
-        else:
-            return None
-
-    try:
-        # Aggregate if needed to avoid overly long charts
-        chart_df = df[[x_col, y_col]].copy().dropna()
-        use_line = pd.api.types.is_numeric_dtype(chart_df[x_col]) or pd.api.types.is_datetime64_any_dtype(chart_df[x_col])
-        if not use_line:
-            chart_df = chart_df.groupby(x_col, as_index=False)[y_col].mean().sort_values(by=y_col, ascending=False)
-
-        if len(chart_df) > 20:
-            chart_df = chart_df.head(20)
-
-        fig, ax = plt.subplots(figsize=(6, 4))
-        if use_line:
-            ax.plot(chart_df[x_col], chart_df[y_col], marker="o", color="#60a5fa")
-        else:
-            ax.bar(chart_df[x_col], chart_df[y_col], color="#60a5fa")
-
-        ax.set_xlabel(x_col)
-        ax.set_ylabel(y_col)
-        ax.set_title(f"{y_col} by {x_col}")
-        ax.grid(color="#1e293b", linestyle="--", linewidth=0.5, alpha=0.6)
-        plt.xticks(rotation=45, ha="right")
-        plt.tight_layout()
-
-        buffer = io.BytesIO()
-        fig.savefig(buffer, format="png", dpi=150, facecolor="#0b1120")
-        plt.close(fig)
-        encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
-        return f"![Auto-generated chart](data:image/png;base64,{encoded})"
-    except Exception:
-        return None
+    # Chart generation has been disabled for this deployment because no
+    # plotting backend is bundled. The assistant will rely on tables instead.
+    return None
 
 ###############################################################################
 # 5. GRADIO INTERFACE
