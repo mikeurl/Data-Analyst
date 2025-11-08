@@ -25,6 +25,7 @@ import sys
 from openai import OpenAI
 import gradio as gr
 import pandas as pd
+import numpy as np
 
 # Import database setup functions for auto-initialization
 from create_ipeds_db_schema import create_ipeds_db_schema
@@ -143,11 +144,11 @@ def run_sql(sql_query):
 def run_python_code(py_code, df):
     """
     Executes the provided Python code snippet in a restricted local environment
-    containing 'df' (the DataFrame from the SQL step) and 'pd' (pandas).
+    containing 'df' (the DataFrame from the SQL step), 'pd' (pandas), and 'np' (numpy).
     Expects the code to store its final output in a variable named 'result'.
     Returns a string version of 'result'.
     """
-    local_vars = {"df": df, "pd": pd}
+    local_vars = {"df": df, "pd": pd, "np": np}
     try:
         exec(py_code, {}, local_vars)
         output = local_vars.get("result", "No 'result' variable set.")
@@ -356,7 +357,27 @@ Preview of df:
 {df_preview[:1000]}  -- truncated
 
 Write Python code that uses 'df' to further explore or summarize the data.
-Store final output in a variable named 'result'. Return ONLY the code (no triple backticks).
+
+AVAILABLE LIBRARIES (already imported as 'pd'):
+- pandas (as pd) - for data manipulation
+- numpy (as np) - for numerical operations
+- statsmodels - for regression, statistical models (import as needed)
+- scipy - for scientific computing (import as needed)
+- scikit-learn (sklearn) - for machine learning (import as needed)
+
+IMPORTANT:
+- The DataFrame 'df' and pandas module 'pd' are already available
+- For other libraries, include the import statement in your code
+- Store final output in a variable named 'result'
+- Return ONLY the code (no triple backticks, no markdown)
+- Make 'result' a readable string or formatted output, not just a model object
+
+Example for regression:
+import statsmodels.api as sm
+X = df[['column1', 'column2']]
+y = df['target']
+model = sm.OLS(y, sm.add_constant(X)).fit()
+result = model.summary().as_text()
 """
     response = client.chat.completions.create(
         model="gpt-4o",
