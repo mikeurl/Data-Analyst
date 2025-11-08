@@ -159,6 +159,63 @@ def run_python_code(py_code, df):
 # 4. GPT INTERACTION
 ###############################################################################
 
+def validate_sql_safety(sql_code):
+    """
+    Validates that SQL contains only safe, read-only operations.
+    Allows: SELECT statements and CREATE TEMP/TEMPORARY TABLE
+    Blocks: DROP, DELETE, UPDATE, INSERT (into permanent tables), ALTER, etc.
+
+    Returns: (is_safe: bool, error_message: str or None)
+    """
+    # Normalize the SQL: uppercase, remove extra whitespace
+    sql_normalized = ' '.join(sql_code.upper().split())
+
+    # Remove comments to avoid bypasses like "-- DROP" in comments
+    # Remove single-line comments (-- comment)
+    sql_no_comments = '\n'.join([
+        line.split('--')[0] for line in sql_code.split('\n')
+    ])
+    # Remove multi-line comments (/* comment */)
+    sql_no_comments = re.sub(r'/\*.*?\*/', '', sql_no_comments, flags=re.DOTALL)
+    sql_normalized = ' '.join(sql_no_comments.upper().split())
+
+    # Dangerous keywords that should never appear (even in temp table contexts)
+    dangerous_keywords = [
+        'DROP', 'DELETE', 'TRUNCATE', 'ALTER',
+        'GRANT', 'REVOKE', 'EXECUTE', 'EXEC',
+        'ATTACH', 'DETACH', 'PRAGMA'
+    ]
+
+    for keyword in dangerous_keywords:
+        # Use word boundaries to avoid false positives (e.g., "DROPPED" column name)
+        if re.search(rf'\b{keyword}\b', sql_normalized):
+            return False, f"Unsafe SQL operation detected: '{keyword}'. Only SELECT queries and temporary tables are allowed."
+
+    # Check for UPDATE - must be very careful
+    if re.search(r'\bUPDATE\b', sql_normalized):
+        return False, "Unsafe SQL operation detected: 'UPDATE'. Only SELECT queries and temporary tables are allowed."
+
+    # Check for INSERT - only allow into temp tables
+    if re.search(r'\bINSERT\b', sql_normalized):
+        # Check if it's inserting into a temp table
+        # Pattern: INSERT INTO temp.tablename or INSERT INTO TEMP tablename
+        if not re.search(r'\bINSERT\s+INTO\s+(TEMP\.|TEMPORARY\.|TEMP\s|TEMPORARY\s)', sql_normalized):
+            return False, "Unsafe SQL operation detected: 'INSERT'. Only SELECT queries and temporary tables are allowed."
+
+    # Must contain SELECT or CREATE TEMP/TEMPORARY TABLE
+    has_select = re.search(r'\bSELECT\b', sql_normalized)
+    has_temp_create = re.search(r'\bCREATE\s+(TEMP|TEMPORARY)\s+TABLE\b', sql_normalized)
+
+    if not (has_select or has_temp_create):
+        return False, "SQL must contain a SELECT statement or CREATE TEMPORARY TABLE."
+
+    # Additional check: if it contains CREATE, ensure it's TEMP/TEMPORARY
+    if re.search(r'\bCREATE\b', sql_normalized):
+        if not re.search(r'\bCREATE\s+(TEMP|TEMPORARY)\s+TABLE\b', sql_normalized):
+            return False, "Only CREATE TEMPORARY TABLE is allowed, not CREATE TABLE for permanent tables."
+
+    return True, None
+
 def ask_gpt_for_sql(user_question, client):
     """
     1) Fetch the live schema from the DB.
@@ -175,6 +232,12 @@ Below is the current schema:
 
 The user wants the following:
 {user_question}
+
+CRITICAL SECURITY REQUIREMENTS:
+- You MUST ONLY generate SELECT queries for reading data
+- You MAY use CREATE TEMP TABLE or CREATE TEMPORARY TABLE if complex analysis requires it
+- You MUST NEVER generate: DROP, DELETE, UPDATE, INSERT (into permanent tables), ALTER, TRUNCATE, or any other data modification statements
+- This is a READ-ONLY interface for data analysis
 
 Please provide ONLY the SQL code, no triple backticks. End with a semicolon.
 """
@@ -274,6 +337,26 @@ For more information, see the README.md file.
     raw_sql_code = ask_gpt_for_sql(user_input, client)
     # Clean out triple backticks or ```sql
     sql_code_clean = remove_sql_fences(raw_sql_code)
+
+    # SECURITY: Validate SQL safety before execution
+    is_safe, safety_error = validate_sql_safety(sql_code_clean)
+    if not is_safe:
+        # SQL failed safety validation
+        explanation = f"🛡️ **Security Check Failed**\n\n{safety_error}\n\nThis interface only allows SELECT queries for data analysis and CREATE TEMPORARY TABLE for complex operations.\n\nPlease rephrase your question to request data analysis rather than data modification."
+        sql_details = (
+            "### Generated SQL (BLOCKED)\n"
+            f"```sql\n{sql_code_clean}\n```\n\n"
+            "### Security Validation Error\n"
+            f"⚠️ {safety_error}\n\n"
+            "**Allowed Operations:**\n"
+            "- SELECT statements for querying data\n"
+            "- CREATE TEMP TABLE for complex analysis\n\n"
+            "**Blocked Operations:**\n"
+            "- DROP, DELETE, UPDATE, INSERT (into permanent tables)\n"
+            "- ALTER, TRUNCATE, GRANT, REVOKE\n"
+            "- ATTACH, DETACH, PRAGMA, EXECUTE"
+        )
+        return explanation, sql_details, "Python analysis was not executed because the SQL was blocked for security reasons."
 
     # Execute
     df_or_error = run_sql(sql_code_clean)
