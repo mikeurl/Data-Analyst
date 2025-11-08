@@ -30,6 +30,10 @@ Hugging Face provides a secure secrets store so you never need to hard-code an A
 
 Avoid embedding API keys directly in source files or the Space config. Secrets keep the key off the public repo history and allow you to rotate or revoke it without shipping code changes.
 
+### Confirming the deployed build
+
+After you update your Space, refresh the app and look at the "Higher Education AI Analyst" header. The blue build tag (for example, `build-20250130-01`) reflects the exact revision currently running. If the tag on the live app does not match the commit you expect, trigger a manual restart from the Space settings to pull the latest code.
+
 ## Example Questions
 
 - "What are the retention rates by race and ethnicity?"

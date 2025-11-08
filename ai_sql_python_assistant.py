@@ -71,6 +71,7 @@ from SyntheticDataforSchema2 import generate_stable_population_data
 ###############################################################################
 
 DB_PATH = "ipeds_data.db"  # Path to your SQLite DB file.
+APP_BUILD_TAG = "build-20250130-01"
 
 # Get OpenAI API key from environment variable - will create client when needed
 DEFAULT_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -525,6 +526,8 @@ def main():
     print(f"\nStarting Higher Education AI Analyst...")
     print(f"Using database: {DB_PATH}")
     print(f"OpenAI Model: gpt-4o")
+    print(f"Build Tag: {APP_BUILD_TAG}")
+    print("Charting backend: disabled (tables-only previews)")
     print("\nLaunching Gradio interface...")
 
     # Two-column layout with ChatGPT styling
@@ -623,6 +626,13 @@ def main():
         margin: 0 !important;
         letter-spacing: 0.08em !important;
         text-transform: uppercase !important;
+    }
+
+    .header-section .build-tag {
+        font-size: 0.7rem !important;
+        color: #38bdf8 !important;
+        margin-top: 6px !important;
+        letter-spacing: 0.12em !important;
     }
 
     /* Question input */
@@ -901,11 +911,12 @@ def main():
             # LEFT COLUMN - Input side
             with gr.Column(elem_classes=["left-column"], scale=1):
                 # Header
-                gr.HTML("""
+                gr.HTML(f"""
                     <div class="header-section">
                         <img src="https://raw.githubusercontent.com/mikeurl/Data-Analyst/claude/review-repo-structure-011CUqm6vjgy43VX5NmComtm/docs/logo.png"
                              alt="Higher Education AI Analyst">
                         <h1>Higher Education AI Analyst</h1>
+                        <p class="build-tag">{APP_BUILD_TAG}</p>
                     </div>
                 """)
 
