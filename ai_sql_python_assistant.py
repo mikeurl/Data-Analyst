@@ -401,6 +401,10 @@ def main():
         color: inherit;
     }
 
+    .gradio-container * {
+        color: inherit;
+    }
+
     /* Two-column layout */
     .two-column-container {
         display: grid !important;
