@@ -18,6 +18,7 @@ additional security measures.
 """
 
 import base64
+import importlib
 import io
 import json
 import os
@@ -41,6 +42,28 @@ try:
 except ImportError:  # pragma: no cover - optional dependency in some deployments
     matplotlib = None
     plt = None
+
+matplotlib = None
+plt = None
+
+
+def ensure_matplotlib():
+    """Lazy-load matplotlib only when charting is required."""
+
+    global matplotlib, plt
+
+    if matplotlib is not None and plt is not None:
+        return True
+
+    try:
+        matplotlib = importlib.import_module("matplotlib")
+        matplotlib.use("Agg")
+        plt = importlib.import_module("matplotlib.pyplot")
+        return True
+    except ImportError:  # pragma: no cover - optional dependency in some deployments
+        matplotlib = None
+        plt = None
+        return False
 
 # Import database setup functions for auto-initialization
 from create_ipeds_db_schema import create_ipeds_db_schema
@@ -338,7 +361,7 @@ def dataframe_to_markdown(df, max_rows=20):
 
 def generate_quick_chart(df):
     """Create a simple chart encoded as a Markdown image when data supports it."""
-    if plt is None or df is None or not isinstance(df, pd.DataFrame) or df.empty:
+    if not ensure_matplotlib() or df is None or not isinstance(df, pd.DataFrame) or df.empty:
         return None
 
     df_numeric = df.select_dtypes(include="number")
