@@ -17,6 +17,9 @@ inputs and in controlled environments. Not recommended for production use withou
 additional security measures.
 """
 
+import base64
+import io
+import json
 import os
 import re
 import sqlite3
@@ -25,6 +28,10 @@ import sys
 from openai import OpenAI
 import gradio as gr
 import pandas as pd
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 # Import database setup functions for auto-initialization
 from create_ipeds_db_schema import create_ipeds_db_schema
@@ -127,6 +134,23 @@ def remove_python_fences(py_text):
     else:
         return py_text.replace("```", "").strip()
 
+def is_destructive_sql(sql_code):
+    """Return True if the SQL code appears to perform a destructive operation."""
+    normalized = re.sub(r"\s+", " ", sql_code).strip().lower()
+    destructive_keywords = [
+        "drop ", "delete ", "truncate ", "alter ", "update ", "insert ",
+        "replace ", "create table", "attach ", "detach ", "pragma "
+    ]
+    if any(keyword in normalized for keyword in destructive_keywords):
+        return True
+
+    # Block multi-statement queries
+    if normalized.count(";") > 1:
+        return True
+
+    return False
+
+
 def run_sql(sql_query):
     """
     Executes the given SQL query against DB_PATH and returns a pandas DataFrame.
@@ -176,7 +200,12 @@ Below is the current schema:
 The user wants the following:
 {user_question}
 
-Please provide ONLY the SQL code, no triple backticks. End with a semicolon.
+Important safety requirements:
+- Return a single, read-only SELECT statement.
+- Never modify data (no INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, TRUNCATE, PRAGMA, ATTACH, DETACH, or other side effects).
+- Do not include comments or explanations.
+
+Provide ONLY the SQL code, no triple backticks, ending with a semicolon.
 """
     response = client.chat.completions.create(
         model="gpt-4o",
@@ -207,10 +236,12 @@ Store final output in a variable named 'result'. Return ONLY the code (no triple
     )
     return response.choices[0].message.content
 
-def ask_gpt_for_explanation(sql_code, sql_result_str, py_code, py_result_str, client):
+def ask_gpt_for_explanation(sql_code, sql_result_str, py_code, py_result_str, client, python_used, plan):
     """
     Combine everything into a final explanation for the user.
     """
+    python_status = "executed" if python_used else "skipped as unnecessary"
+    plan_reason = plan.get("reason", "No additional context provided.")
     prompt = f"""
 We had the following steps:
 
@@ -220,13 +251,16 @@ We had the following steps:
 2) Output from the SQL (or error):
 {sql_result_str}
 
-3) Python code:
+3) Python code ({python_status}):
 {py_code}
 
-4) Output from the Python code (or error):
+4) Output from the Python code (or explanation of why it was skipped):
 {py_result_str}
 
-Provide a concise, friendly explanation of these results for the user.
+Python analysis decision rationale:
+{plan_reason}
+
+Provide a concise, friendly explanation of these results for the user. Highlight key findings and reference any tables or visual summaries included in the response.
 """
     response = client.chat.completions.create(
         model="gpt-4o",
@@ -235,6 +269,119 @@ Provide a concise, friendly explanation of these results for the user.
     )
     return response.choices[0].message.content
 
+
+def determine_analysis_plan(user_question, df_preview, client):
+    """Ask GPT whether Python analysis is necessary and which presentation to favor."""
+    plan_prompt = f"""
+You evaluate whether a pandas DataFrame returned from a SQL query needs additional Python analysis.
+
+Question: {user_question}
+SQL preview:\n{df_preview}
+
+Decide if Python (e.g., advanced statistics, regressions, complex reshaping) is required beyond SQL.
+Respond strictly in JSON with keys:
+  requires_python: boolean
+  reason: short string explaining your decision
+  recommended_presentation: one of ["narrative", "table", "chart", "table_and_chart"]
+
+Choose "chart" or "table_and_chart" when the data benefits from visualization (e.g., trends, comparisons, distributions).
+If the preview is empty, set requires_python to false.
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "system", "content": plan_prompt}],
+            temperature=0.0
+        )
+        content = response.choices[0].message.content.strip()
+        if content.startswith("```"):
+            fenced_match = re.search(r"```(?:json)?\n(.*?)\n```", content, re.DOTALL)
+            if fenced_match:
+                content = fenced_match.group(1).strip()
+        plan = json.loads(content)
+        requires_python = bool(plan.get("requires_python", False))
+        presentation = plan.get("recommended_presentation", "table")
+        reason = plan.get("reason", "")
+        return {
+            "requires_python": requires_python,
+            "recommended_presentation": presentation,
+            "reason": reason,
+        }
+    except Exception:
+        return {
+            "requires_python": False,
+            "recommended_presentation": "table",
+            "reason": "Defaulted to safe presentation; automated planning was unavailable.",
+        }
+
+
+def dataframe_to_markdown(df, max_rows=20):
+    """Convert a DataFrame preview to Markdown, limiting the number of rows."""
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return "No rows returned from the SQL query."
+    preview_df = df.head(max_rows)
+    try:
+        return preview_df.to_markdown(index=False)
+    except Exception:
+        return preview_df.to_string(index=False)
+
+
+def generate_quick_chart(df):
+    """Create a simple chart encoded as a Markdown image when data supports it."""
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return None
+
+    df_numeric = df.select_dtypes(include="number")
+    if df_numeric.empty:
+        return None
+
+    numeric_cols = list(df_numeric.columns)
+    x_col = None
+    y_col = numeric_cols[0]
+
+    for col in df.columns:
+        if col != y_col:
+            x_col = col
+            break
+
+    if not x_col:
+        if len(numeric_cols) > 1:
+            x_col = numeric_cols[1]
+        else:
+            return None
+
+    try:
+        # Aggregate if needed to avoid overly long charts
+        chart_df = df[[x_col, y_col]].copy().dropna()
+        use_line = pd.api.types.is_numeric_dtype(chart_df[x_col]) or pd.api.types.is_datetime64_any_dtype(chart_df[x_col])
+        if not use_line:
+            chart_df = chart_df.groupby(x_col, as_index=False)[y_col].mean().sort_values(by=y_col, ascending=False)
+
+        if len(chart_df) > 20:
+            chart_df = chart_df.head(20)
+
+        fig, ax = plt.subplots(figsize=(6, 4))
+        if use_line:
+            ax.plot(chart_df[x_col], chart_df[y_col], marker="o", color="#60a5fa")
+        else:
+            ax.bar(chart_df[x_col], chart_df[y_col], color="#60a5fa")
+
+        ax.set_xlabel(x_col)
+        ax.set_ylabel(y_col)
+        ax.set_title(f"{y_col} by {x_col}")
+        ax.grid(color="#1e293b", linestyle="--", linewidth=0.5, alpha=0.6)
+        plt.xticks(rotation=45, ha="right")
+        plt.tight_layout()
+
+        buffer = io.BytesIO()
+        fig.savefig(buffer, format="png", dpi=150, facecolor="#0b1120")
+        plt.close(fig)
+        encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        return f"![Auto-generated chart](data:image/png;base64,{encoded})"
+    except Exception:
+        return None
+
 ###############################################################################
 # 5. GRADIO INTERFACE
 ###############################################################################
@@ -242,9 +389,10 @@ Provide a concise, friendly explanation of these results for the user.
 def ai_assistant(user_input, api_key_input):
     """
     1) GPT -> SQL code (fenced or unfenced).
-    2) Remove fences, run the query.
-    3) GPT -> Python code, remove fences, run the code.
-    4) GPT -> final explanation.
+    2) Remove fences, validate for safety, run the query.
+    3) Plan presentation and decide whether Python analysis is necessary.
+    4) Optionally run GPT-generated Python code when required.
+    5) GPT -> final explanation enriched with tables or visuals when possible.
     """
     # Use the API key from input if provided, otherwise use the default one
     active_api_key = api_key_input.strip() if api_key_input and api_key_input.strip() else DEFAULT_API_KEY
@@ -275,6 +423,19 @@ For more information, see the README.md file.
     # Clean out triple backticks or ```sql
     sql_code_clean = remove_sql_fences(raw_sql_code)
 
+    if is_destructive_sql(sql_code_clean):
+        warning_message = (
+            "The generated SQL was blocked because it might modify the database. "
+            "Only read-only SELECT statements are allowed. Please rephrase your question."
+        )
+        sql_details = (
+            "### Generated SQL (Blocked)\n"
+            f"```sql\n{sql_code_clean}\n```\n\n"
+            "### Reason\n"
+            "Potentially destructive SQL statements are not permitted."
+        )
+        return warning_message, sql_details, "Python analysis was skipped because the SQL step was blocked."
+
     # Execute
     df_or_error = run_sql(sql_code_clean)
     if isinstance(df_or_error, str) and df_or_error.startswith("SQL Error:"):
@@ -288,7 +449,7 @@ For more information, see the README.md file.
         )
         return explanation, sql_details, "Python analysis was not executed because the SQL step failed."
 
-    # Build a short preview of the DataFrame
+    # Build previews and plan presentation
     if isinstance(df_or_error, pd.DataFrame):
         preview = df_or_error.head().to_string(index=False)
         cols_list = df_or_error.columns.tolist()
@@ -296,11 +457,27 @@ For more information, see the README.md file.
     else:
         df_preview_str = str(df_or_error)
 
-    # Step B: GPT for Python
-    raw_py_code = ask_gpt_for_python(user_input, df_preview_str, client)
-    py_code_clean = remove_python_fences(raw_py_code)
+    plan = determine_analysis_plan(user_input, df_preview_str, client)
+    requires_python = plan.get("requires_python", False)
 
-    py_result = run_python_code(py_code_clean, df_or_error)
+    table_markdown = dataframe_to_markdown(df_or_error)
+    chart_markdown = None
+    if plan.get("recommended_presentation") in {"chart", "table_and_chart"}:
+        chart_markdown = generate_quick_chart(df_or_error)
+        if not chart_markdown and plan.get("recommended_presentation") in {"chart", "table_and_chart"}:
+            # fallback to table if chart generation fails
+            plan["recommended_presentation"] = "table"
+
+    # Step B: GPT for Python (conditional)
+    python_used = False
+    if requires_python:
+        raw_py_code = ask_gpt_for_python(user_input, df_preview_str, client)
+        py_code_clean = remove_python_fences(raw_py_code)
+        py_result = run_python_code(py_code_clean, df_or_error)
+        python_used = True
+    else:
+        py_code_clean = "# Python analysis was not required for this question."
+        py_result = "Python analysis was skipped based on the planning step."
 
     # Step C: GPT final explanation
     final_explanation = ask_gpt_for_explanation(
@@ -308,31 +485,50 @@ For more information, see the README.md file.
         df_preview_str,
         py_code_clean,
         py_result,
-        client
+        client,
+        python_used,
+        plan,
     )
 
-    summary_tab = (
-        "### Your Question\n"
-        f"{user_input}\n\n"
-        "### Assistant Explanation\n"
-        f"{final_explanation}"
-    )
+    summary_sections = [
+        "### Your Question\n" + f"{user_input}",
+        "### Assistant Explanation\n" + f"{final_explanation}",
+    ]
+
+    if plan.get("recommended_presentation") in {"table", "table_and_chart"} and table_markdown:
+        summary_sections.append("### Result Snapshot\n" + table_markdown)
+
+    if chart_markdown:
+        summary_sections.append("### Visual Summary\n" + chart_markdown)
+
+    summary_tab = "\n\n".join(summary_sections)
 
     sql_tab = (
         "### Generated SQL\n"
         f"```sql\n{sql_code_clean}\n```\n\n"
         "### SQL Result Preview\n"
-        f"```\n{df_preview_str}\n```"
+        f"```\n{df_preview_str}\n```\n\n"
+        "### Presentation Plan\n"
+        f"- Python required: {'Yes' if requires_python else 'No'}\n"
+        f"- Recommended view: {plan.get('recommended_presentation', 'table')}\n"
+        f"- Rationale: {plan.get('reason', 'Not provided')}"
     )
 
-    python_tab = (
-        "### Python Analysis Code\n"
-        f"```python\n{py_code_clean}\n```\n\n"
-        "### Python Output\n"
-        f"```\n{py_result}\n```"
-    )
+    if python_used:
+        python_output_section = (
+            "### Python Analysis Code\n"
+            f"```python\n{py_code_clean}\n```\n\n"
+            "### Python Output\n"
+            f"```\n{py_result}\n```"
+        )
+    else:
+        python_output_section = (
+            "### Python Analysis\n"
+            "Python execution was skipped because the SQL result fully answered the question."
+            f"\n\n**Reason:** {plan.get('reason', 'No additional rationale provided.')}"
+        )
 
-    return summary_tab, sql_tab, python_tab
+    return summary_tab, sql_tab, python_output_section
 
 def main():
     """Launch the Gradio web interface for the AI assistant."""
