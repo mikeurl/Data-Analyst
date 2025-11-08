@@ -627,12 +627,11 @@ def main():
         border-radius: 14px !important;
         padding: 20px !important;
         min-height: 200px !important;
-        max-height: 340px !important;
-        overflow-y: auto !important;
         font-size: 0.9rem !important;
         line-height: 1.55 !important;
         color: #f8fafc !important;
         box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.06) !important;
+        overflow: visible !important;
     }
 
     .results-pane pre {
