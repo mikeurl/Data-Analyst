@@ -218,21 +218,36 @@ USER'S QUESTION:
 
 TASK: Determine if this question can be answered using the database.
 
-ACCEPT questions about:
-- Student data, enrollment, demographics, retention, graduation
-- GPA, class year, programs, terms
-- Statistics, trends, comparisons, correlations from the data
-- Any analysis that requires querying the student database
+IMPORTANT: Be permissive - when in doubt, say YES. Only reject obviously off-topic questions.
 
-REJECT questions about:
-- General knowledge (capitals, definitions, history, etc.)
-- Math problems or calculations not related to the data
-- Questions about other topics/domains not in the database
-- Requests for information that clearly isn't in a student database
+DEFINITELY ACCEPT questions about:
+- Student enrollment, counts, demographics (even specific terms like "Fall 2024")
+- Academic performance, GPA, grades, retention, graduation
+- Programs, majors, class years, terms, semesters
+- Statistics, trends, comparisons, correlations from student data
+- ANY analysis that could reasonably involve student database queries
+- Questions about specific time periods, cohorts, or subgroups
+
+ONLY REJECT questions that are:
+- Obviously general knowledge (e.g., "What is the capital of France?")
+- Pure math problems unrelated to data (e.g., "What is 15 + 27?")
+- About completely different domains (e.g., "How do I bake a cake?")
+- Clearly not about higher education or student data
+
+Examples that SHOULD be accepted:
+- "How many students were enrolled in Fall 2024?" ✅ YES
+- "What are the retention rates?" ✅ YES
+- "Show me GPA trends" ✅ YES
+- "Which program has the most students?" ✅ YES
+
+Examples that SHOULD be rejected:
+- "What is the capital of France?" ❌ NO (general knowledge)
+- "How do I cook pasta?" ❌ NO (unrelated topic)
+- "What is 2 + 2?" ❌ NO (pure math)
 
 Respond with ONLY:
-YES - if the question is about data in the database
-NO - if the question is off-topic or general knowledge
+YES - if the question is about data in the database (default to YES when uncertain)
+NO - if the question is obviously off-topic
 
 Then on a new line, briefly explain your reasoning (1 sentence).
 """
