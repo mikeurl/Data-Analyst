@@ -181,7 +181,12 @@ if _cat_cols:
 # Keep numeric columns and preserved time columns
 _num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
 _final_cols = _num_cols + [col for col in _time_cols if col in df.columns]
-df = df[_final_cols]
+
+# guard: only subset if we actually have columns
+if _final_cols:
+    df = df[_final_cols]
+else:
+    df = df.select_dtypes(include=[np.number])
 
 # Drop missing values
 df = df.dropna()
@@ -199,12 +204,12 @@ df = df.dropna()
     }
 
     try:
-        exec(full_code, {}, local_vars)
+        # Use the SAME dict for globals and locals so imports like 're' are accessible
+        exec(full_code, local_vars, local_vars)
         output = local_vars.get("result", "No 'result' variable set.")
         image_path = local_vars.get("result_image", None)
         return str(output), image_path
     except Exception as e:
-        # if the model code failed only on the plotting step, this will surface it cleanly
         return f"Python Error: {str(e)}", None
 
 ###############################################################################
