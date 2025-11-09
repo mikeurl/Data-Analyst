@@ -164,14 +164,26 @@ def run_python_code(py_code, df):
     # This runs BEFORE GPT's code, converting df in place
     forced_prep = """
 # AUTOMATIC CATEGORICAL CONVERSION (runs before your code)
+# Identify text-like columns, but preserve time-related columns
 text_like = df.select_dtypes(include=['object', 'string', 'category']).columns.tolist()
-if text_like:
-    df = pd.get_dummies(df, columns=text_like, drop_first=True)
 
-# after dummies, keep only numeric columns to be extra safe
-df = df.select_dtypes(include=[np.number])
+# Don't convert time-related columns to dummies (needed for trends/time series)
+time_related_keywords = ['term', 'year', 'date', 'semester', 'quarter', 'month', 'day', 'time', 'period']
+columns_to_convert = [col for col in text_like
+                      if not any(keyword in col.lower() for keyword in time_related_keywords)]
 
-# and only then drop rows with missing numeric data
+# Convert only true categorical columns (gender, race, program, etc.) to dummies
+if columns_to_convert:
+    df = pd.get_dummies(df, columns=columns_to_convert, drop_first=True)
+
+# After dummies, keep only numeric columns plus preserved time columns
+numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+preserved_time_cols = [col for col in text_like
+                       if any(keyword in col.lower() for keyword in time_related_keywords)
+                       and col in df.columns]
+df = df[numeric_cols + preserved_time_cols]
+
+# Drop rows with missing data
 df = df.dropna()
 """
 
