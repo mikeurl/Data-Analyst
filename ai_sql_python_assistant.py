@@ -29,8 +29,6 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend for server
 import matplotlib.pyplot as plt
-import io
-import base64
 
 # Import database setup functions for auto-initialization
 from create_ipeds_db_schema import create_ipeds_db_schema
@@ -150,24 +148,29 @@ def run_python_code(py_code, df):
     """
     Executes the provided Python code snippet in a restricted local environment
     containing 'df' (the DataFrame from the SQL step), 'pd' (pandas), 'np' (numpy),
-    'plt' (matplotlib.pyplot), 'io', and 'base64' for creating embedded charts.
+    'plt' (matplotlib.pyplot), 'tempfile', and 'os' for creating charts.
     Expects the code to store its final output in a variable named 'result'.
-    Returns a string version of 'result'.
+    Optionally, the code can store a chart file path in 'result_image'.
+    Returns a tuple: (result_text, image_path or None)
     """
+    import tempfile
+    import os
+
     local_vars = {
         "df": df,
         "pd": pd,
         "np": np,
         "plt": plt,
-        "io": io,
-        "base64": base64
+        "tempfile": tempfile,
+        "os": os
     }
     try:
         exec(py_code, {}, local_vars)
         output = local_vars.get("result", "No 'result' variable set.")
-        return str(output)
+        image_path = local_vars.get("result_image", None)
+        return str(output), image_path
     except Exception as e:
-        return f"Python Error: {str(e)}"
+        return f"Python Error: {str(e)}", None
 
 ###############################################################################
 # 4. GPT INTERACTION
@@ -375,8 +378,7 @@ AVAILABLE LIBRARIES (already available):
 - pandas (pd) - for data manipulation
 - numpy (np) - for numerical operations
 - matplotlib.pyplot (plt) - for charts
-- io - for byte streams
-- base64 - for encoding images
+- tempfile, os - for file operations
 - statsmodels - for regression (import as needed)
 - scipy - for scientific computing (import as needed)
 - scikit-learn (sklearn) - for ML (import as needed)
@@ -390,17 +392,20 @@ IMPORTANT DATA PREPARATION:
 
 VISUALIZATIONS (when appropriate):
 - Add charts for trends, distributions, comparisons, correlations
-- Use matplotlib to create chart, convert to base64, embed in result
+- Use matplotlib to create chart, save to temp file
 - Charts enhance understanding for time series, demographics, patterns
 - Don't create charts for simple counts or single values
 
 IMPORTANT OUTPUT:
-- Store final output in a variable named 'result'
+- Store final text output in a variable named 'result'
+- If you create a chart, store the file path in a variable named 'result_image'
 - Return ONLY the code (no triple backticks, no markdown)
 - Make 'result' a readable string or formatted output
-- Include embedded charts in markdown format when useful
 
-Example for creating an embedded chart:
+Example for creating a visualization:
+import tempfile
+import os
+
 # Create visualization
 plt.figure(figsize=(10, 6))
 df.plot(x='year', y='enrollment', kind='line', ax=plt.gca())
@@ -409,22 +414,19 @@ plt.xlabel('Year')
 plt.ylabel('Number of Students')
 plt.grid(True, alpha=0.3)
 
-# Convert to base64
-buf = io.BytesIO()
-plt.savefig(buf, format='png', bbox_inches='tight', dpi=100)
-buf.seek(0)
-img_base64 = base64.b64encode(buf.read()).decode('utf-8')
+# Save to temp file
+temp_dir = tempfile.gettempdir()
+result_image = os.path.join(temp_dir, f'chart_{{hash(str(df.values.tobytes()))}}.png')
+plt.savefig(result_image, format='png', bbox_inches='tight', dpi=100)
 plt.close()
 
-# Build result with embedded image
+# Build result text
 result = f\"\"\"## Enrollment Analysis
 
 Total students: {{len(df)}}
 
-### Trend Visualization
-![Enrollment Trend](data:image/png;base64,{{img_base64}})
-
 The chart shows enrollment patterns over the analyzed period.
+See visualization below.
 \"\"\"
 
 Example for regression with categorical variables:
@@ -538,7 +540,7 @@ Steps to get started:
 
 For more information, see the README.md file.
 """
-        return message, "Awaiting a valid API key to generate SQL details.", "Awaiting a valid API key to generate Python details."
+        return message, "Awaiting a valid API key to generate SQL details.", "Awaiting a valid API key to generate Python details.", None
 
     # Create OpenAI client with the API key
     client = OpenAI(api_key=active_api_key)
@@ -564,7 +566,7 @@ For more information, see the README.md file.
             "- 'List all records where...'\n"
             "- 'Analyze trends in...'"
         )
-        return intent_warning, sql_details, "Python analysis was not executed because the request was blocked."
+        return intent_warning, sql_details, "Python analysis was not executed because the request was blocked.", None
 
     # Step A: GPT for SQL
     raw_sql_code = ask_gpt_for_sql(user_input, client)
@@ -589,7 +591,7 @@ For more information, see the README.md file.
             "- ALTER, TRUNCATE, GRANT, REVOKE\n"
             "- ATTACH, DETACH, PRAGMA, EXECUTE"
         )
-        return explanation, sql_details, "Python analysis was not executed because the SQL was blocked for security reasons."
+        return explanation, sql_details, "Python analysis was not executed because the SQL was blocked for security reasons.", None
 
     # Execute
     df_or_error = run_sql(sql_code_clean)
@@ -602,7 +604,7 @@ For more information, see the README.md file.
             "### Error\n"
             f"{df_or_error}"
         )
-        return explanation, sql_details, "Python analysis was not executed because the SQL step failed."
+        return explanation, sql_details, "Python analysis was not executed because the SQL step failed.", None
 
     # Build a short preview of the DataFrame
     if isinstance(df_or_error, pd.DataFrame):
@@ -621,11 +623,12 @@ For more information, see the README.md file.
     if should_run_python:
         raw_py_code = ask_gpt_for_python(user_input, df_preview_str, client)
         py_code_clean = remove_python_fences(raw_py_code)
-        py_result = run_python_code(py_code_clean, df_or_error)
+        py_result, image_path = run_python_code(py_code_clean, df_or_error)
     else:
         # Skip Python - SQL results are sufficient
         py_code_clean = None
         py_result = f"Python analysis skipped.\n\nReason: {decision_reason}"
+        image_path = None
 
     # Step C: GPT final explanation
     final_explanation = ask_gpt_for_explanation(
@@ -671,7 +674,7 @@ For more information, see the README.md file.
             f"```\n{py_result}\n```"
         )
 
-    return summary_tab, sql_tab, python_tab
+    return summary_tab, sql_tab, python_tab, image_path
 
 def main():
     """Launch the Gradio web interface for the AI assistant."""
@@ -1204,18 +1207,26 @@ Do not deploy with real student data without implementing:
                             elem_id="python-pane"
                         )
 
+                # Visualization output (when Python generates charts)
+                image_output = gr.Image(
+                    label="Visualization",
+                    visible=True,
+                    show_label=True,
+                    type="filepath"
+                )
+
         # Connect the submit button
         submit_btn.click(
             fn=ai_assistant,
             inputs=[question_input, api_key_input],
-            outputs=[answer_output, sql_output, python_output]
+            outputs=[answer_output, sql_output, python_output, image_output]
         )
 
         # Also allow Enter key to submit (Enter will submit the form; multiline will use Shift+Enter for newline)
         question_input.submit(
             fn=ai_assistant,
             inputs=[question_input, api_key_input],
-            outputs=[answer_output, sql_output, python_output]
+            outputs=[answer_output, sql_output, python_output, image_output]
         )
 
         # Connect example buttons to populate the question input using gr.update which is robust across gradio versions
