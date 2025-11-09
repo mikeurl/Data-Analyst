@@ -149,12 +149,33 @@ def run_python_code(py_code, df):
     Executes the provided Python code snippet in a restricted local environment
     containing 'df' (the DataFrame from the SQL step), 'pd' (pandas), 'np' (numpy),
     'plt' (matplotlib.pyplot), 'tempfile', and 'os' for creating charts.
+
+    IMPORTANT: This function automatically converts categorical/object columns to
+    numeric dummy variables before executing the code. This prevents statsmodels
+    and sklearn errors when GPT forgets to do proper data preparation.
+
     Expects the code to store its final output in a variable named 'result'.
     Optionally, the code can store a chart file path in 'result_image'.
     Returns a tuple: (result_text, image_path or None)
     """
     import tempfile
     import os
+
+    # AUTOMATIC CATEGORICAL HANDLING: Convert object columns to dummies
+    # This ensures statsmodels/sklearn won't fail even if GPT's code doesn't handle it
+    if isinstance(df, pd.DataFrame):
+        df_clean = df.copy()
+        categorical_cols = df_clean.select_dtypes(include=['object']).columns.tolist()
+
+        if categorical_cols:
+            # Store original df in case code needs it
+            df_original = df.copy()
+
+            # Convert categorical columns to dummy variables
+            df_clean = pd.get_dummies(df_clean, columns=categorical_cols, drop_first=True)
+
+            # Use the cleaned dataframe by default
+            df = df_clean
 
     local_vars = {
         "df": df,
