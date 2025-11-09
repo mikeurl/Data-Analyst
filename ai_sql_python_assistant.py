@@ -150,32 +150,12 @@ def run_python_code(py_code, df):
     containing 'df' (the DataFrame from the SQL step), 'pd' (pandas), 'np' (numpy),
     'plt' (matplotlib.pyplot), 'tempfile', and 'os' for creating charts.
 
-    IMPORTANT: This function automatically converts categorical/object columns to
-    numeric dummy variables before executing the code. This prevents statsmodels
-    and sklearn errors when GPT forgets to do proper data preparation.
-
     Expects the code to store its final output in a variable named 'result'.
     Optionally, the code can store a chart file path in 'result_image'.
     Returns a tuple: (result_text, image_path or None)
     """
     import tempfile
     import os
-
-    # AUTOMATIC CATEGORICAL HANDLING: Convert object columns to dummies
-    # This ensures statsmodels/sklearn won't fail even if GPT's code doesn't handle it
-    if isinstance(df, pd.DataFrame):
-        df_clean = df.copy()
-        categorical_cols = df_clean.select_dtypes(include=['object']).columns.tolist()
-
-        if categorical_cols:
-            # Store original df in case code needs it
-            df_original = df.copy()
-
-            # Convert categorical columns to dummy variables
-            df_clean = pd.get_dummies(df_clean, columns=categorical_cols, drop_first=True)
-
-            # Use the cleaned dataframe by default
-            df = df_clean
 
     local_vars = {
         "df": df,
@@ -775,7 +755,15 @@ For more information, see the README.md file.
         )
         return explanation, sql_details, "Python analysis was not executed because the SQL step failed.", gr.update(visible=False, value=None)
 
-    # Build a short preview of the DataFrame
+    # AUTOMATIC CATEGORICAL HANDLING: Convert object/string columns to numeric dummies
+    # This happens BEFORE GPT sees the data, so it knows what columns are available
+    if isinstance(df_or_error, pd.DataFrame):
+        categorical_cols = df_or_error.select_dtypes(include=['object']).columns.tolist()
+        if categorical_cols:
+            # Convert categorical columns to dummy variables
+            df_or_error = pd.get_dummies(df_or_error, columns=categorical_cols, drop_first=True)
+
+    # Build a short preview of the DataFrame (now with converted columns)
     if isinstance(df_or_error, pd.DataFrame):
         preview = df_or_error.head().to_string(index=False)
         cols_list = df_or_error.columns.tolist()
