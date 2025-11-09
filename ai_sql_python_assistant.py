@@ -613,6 +613,12 @@ SQL results:
 
 Note: Python analysis was determined to be unnecessary for this straightforward query.
 
+CRITICAL - Answer based on FULL DATASET:
+- The SQL results section includes the TOTAL ROW COUNT and summary statistics
+- A 5-row sample is shown for reference only
+- Your answer should be based on the FULL dataset (total rows), NOT just the 5-row sample
+- Report counts, statistics, and findings for ALL the data, not just the sample rows
+
 Provide a concise, friendly explanation of these SQL results for the user. Answer their question directly based on the data shown.
 
 CRITICAL - HANDLING MISSING DATA FIELDS:
@@ -659,6 +665,11 @@ We had the following steps:
 
 4) Output from the Python code (or error):
 {py_result_str}
+
+CRITICAL - Answer based on FULL DATASET:
+- The SQL results section includes the TOTAL ROW COUNT
+- The Python analysis ran on the FULL dataset, not just a sample
+- Report findings for ALL the data in the dataset
 
 Provide a concise, friendly explanation of these results for the user.
 
@@ -804,9 +815,24 @@ For more information, see the README.md file.
 
     # Build a short preview of the DataFrame
     if isinstance(df_or_error, pd.DataFrame):
+        total_rows = len(df_or_error)
         preview = df_or_error.head().to_string(index=False)
         cols_list = df_or_error.columns.tolist()
-        df_preview_str = f"Columns: {cols_list}\nFirst 5 rows:\n{preview}"
+
+        # Include summary statistics for the FULL dataset
+        summary_stats = df_or_error.describe(include='all').to_string()
+
+        df_preview_str = f"""FULL DATASET INFO:
+- Total Rows: {total_rows}
+- Columns: {cols_list}
+
+SAMPLE (First 5 rows for reference):
+{preview}
+
+SUMMARY STATISTICS (for all {total_rows} rows):
+{summary_stats}
+
+IMPORTANT: The above sample shows only 5 rows, but the FULL dataset contains {total_rows} rows. Base your analysis on the full dataset, not just the sample."""
     else:
         df_preview_str = str(df_or_error)
 
