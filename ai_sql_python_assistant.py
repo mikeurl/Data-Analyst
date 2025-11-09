@@ -150,12 +150,28 @@ def run_python_code(py_code, df):
     containing 'df' (the DataFrame from the SQL step), 'pd' (pandas), 'np' (numpy),
     'plt' (matplotlib.pyplot), 'tempfile', and 'os' for creating charts.
 
+    IMPORTANT: Automatically prepends categorical conversion code before GPT's code.
+    This ensures statsmodels/sklearn always get numeric data, even if GPT forgets.
+
     Expects the code to store its final output in a variable named 'result'.
     Optionally, the code can store a chart file path in 'result_image'.
     Returns a tuple: (result_text, image_path or None)
     """
     import tempfile
     import os
+
+    # FORCE categorical conversion by prepending to GPT's code
+    # This runs BEFORE GPT's code, converting df in place
+    forced_prep = """
+# AUTOMATIC CATEGORICAL CONVERSION (runs before your code)
+_categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
+if _categorical_cols:
+    df = pd.get_dummies(df, columns=_categorical_cols, drop_first=True)
+df = df.dropna()  # Also handle missing values
+"""
+
+    # Prepend forced conversion to GPT's code
+    full_code = forced_prep + "\n" + py_code
 
     local_vars = {
         "df": df,
@@ -166,7 +182,7 @@ def run_python_code(py_code, df):
         "os": os
     }
     try:
-        exec(py_code, {}, local_vars)
+        exec(full_code, {}, local_vars)
         output = local_vars.get("result", "No 'result' variable set.")
         image_path = local_vars.get("result_image", None)
         return str(output), image_path
@@ -755,15 +771,7 @@ For more information, see the README.md file.
         )
         return explanation, sql_details, "Python analysis was not executed because the SQL step failed.", gr.update(visible=False, value=None)
 
-    # AUTOMATIC CATEGORICAL HANDLING: Convert object/string columns to numeric dummies
-    # This happens BEFORE GPT sees the data, so it knows what columns are available
-    if isinstance(df_or_error, pd.DataFrame):
-        categorical_cols = df_or_error.select_dtypes(include=['object']).columns.tolist()
-        if categorical_cols:
-            # Convert categorical columns to dummy variables
-            df_or_error = pd.get_dummies(df_or_error, columns=categorical_cols, drop_first=True)
-
-    # Build a short preview of the DataFrame (now with converted columns)
+    # Build a short preview of the DataFrame
     if isinstance(df_or_error, pd.DataFrame):
         preview = df_or_error.head().to_string(index=False)
         cols_list = df_or_error.columns.tolist()
