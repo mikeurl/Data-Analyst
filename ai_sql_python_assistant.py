@@ -1358,15 +1358,15 @@ def main():
 
                 with gr.Row(elem_classes=["example-row"]):
                     with gr.Column(scale=1, elem_classes=["example-button"]):
-                        example1 = gr.Button("Retention by Demographics", size="sm")
+                        example1 = gr.Button("Retention Predictors", size="sm")
                     with gr.Column(scale=1, elem_classes=["example-button"]):
-                        example2 = gr.Button("GPA Trends", size="sm")
+                        example2 = gr.Button("Fall 2024 Enrollment", size="sm")
 
                 with gr.Row(elem_classes=["example-row"]):
                     with gr.Column(scale=1, elem_classes=["example-button"]):
-                        example3 = gr.Button("Graduation Statistics", size="sm")
+                        example3 = gr.Button("Enrollment by Program", size="sm")
                     with gr.Column(scale=1, elem_classes=["example-button"]):
-                        example4 = gr.Button("Enrollment Distribution", size="sm")
+                        example4 = gr.Button("Retention Trends", size="sm")
 
                 # API key section
                 gr.HTML('<div class="api-section">')
@@ -1478,22 +1478,22 @@ Do not deploy with real student data without implementing:
 
         # Connect example buttons to populate the question input using gr.update which is robust across gradio versions
         example1.click(
-            fn=lambda: gr.update(value="What are the retention rates by race and ethnicity?"),
+            fn=lambda: gr.update(value="What are the best predictors of student retention?"),
             inputs=None,
             outputs=question_input
         )
         example2.click(
-            fn=lambda: gr.update(value="Show me the average GPA by class year"),
+            fn=lambda: gr.update(value="How many students were enrolled in Fall 2024?"),
             inputs=None,
             outputs=question_input
         )
         example3.click(
-            fn=lambda: gr.update(value="How many students graduated in each program?"),
+            fn=lambda: gr.update(value="What is the total enrollment for Fall 2023 and Fall 2024 by program?"),
             inputs=None,
             outputs=question_input
         )
         example4.click(
-            fn=lambda: gr.update(value="What is the distribution of students across different terms?"),
+            fn=lambda: gr.update(value="What is the retention trend for students?"),
             inputs=None,
             outputs=question_input
         )
