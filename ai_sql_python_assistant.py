@@ -176,6 +176,82 @@ def run_python_code(py_code, df):
 # 4. GPT INTERACTION
 ###############################################################################
 
+def check_question_relevance(user_input, client):
+    """
+    Checks if the user's question is actually about data that could be in the database.
+    Rejects general knowledge questions, calculations, or off-topic queries.
+
+    Returns: (is_relevant: bool, error_message: str or None)
+    """
+    schema_info = get_live_schema_info(DB_PATH)
+
+    prompt = f"""
+You are a gatekeeper for a higher education data analysis system.
+
+DATABASE SCHEMA:
+{schema_info}
+
+USER'S QUESTION:
+{user_input}
+
+TASK: Determine if this question can be answered using the database.
+
+ACCEPT questions about:
+- Student data, enrollment, demographics, retention, graduation
+- GPA, class year, programs, terms
+- Statistics, trends, comparisons, correlations from the data
+- Any analysis that requires querying the student database
+
+REJECT questions about:
+- General knowledge (capitals, definitions, history, etc.)
+- Math problems or calculations not related to the data
+- Questions about other topics/domains not in the database
+- Requests for information that clearly isn't in a student database
+
+Respond with ONLY:
+YES - if the question is about data in the database
+NO - if the question is off-topic or general knowledge
+
+Then on a new line, briefly explain your reasoning (1 sentence).
+"""
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "system", "content": prompt}],
+        temperature=0.0
+    )
+
+    decision_text = response.choices[0].message.content.strip()
+    lines = decision_text.split('\n', 1)
+    decision = lines[0].strip().upper()
+    reason = lines[1].strip() if len(lines) > 1 else "No reason provided"
+
+    is_relevant = decision.startswith('YES')
+
+    if not is_relevant:
+        error_message = f"""🤔 **Question Outside Database Scope**
+
+Your question doesn't appear to be about the student data in this database.
+
+**Reason:** {reason}
+
+**This tool can answer questions like:**
+- "How many students are enrolled?"
+- "What are the retention rates by demographics?"
+- "Show me GPA trends over time"
+- "Which programs have the highest graduation rates?"
+
+**This tool cannot answer:**
+- General knowledge questions
+- Math problems unrelated to the data
+- Questions about topics outside higher education student data
+
+Please ask a question about the student enrollment, demographics, academic performance, or related data in the database.
+"""
+        return False, error_message
+
+    return True, None
+
 def check_user_intent(user_input):
     """
     Checks if the user is asking for a destructive operation.
@@ -482,6 +558,26 @@ SQL results:
 Note: Python analysis was determined to be unnecessary for this straightforward query.
 
 Provide a concise, friendly explanation of these SQL results for the user. Answer their question directly based on the data shown.
+
+IMPORTANT OUTPUT FORMATTING:
+- Include a markdown table when the data would benefit from tabular display
+- Keep tables concise (top 10 rows max, or summarize if more)
+- Use clear column headers
+- Add a brief narrative explanation before or after the table
+- For trend data, enrollment stats, demographic breakdowns, etc., tables are very helpful
+
+Example with table:
+## Enrollment Trends
+
+Here are the enrollment numbers over the past 5 years:
+
+| Year | Enrollment | Change |
+|------|-----------|--------|
+| 2020 | 5,234     | +2.3%  |
+| 2021 | 5,456     | +4.2%  |
+| 2022 | 5,589     | +2.4%  |
+
+The data shows steady growth with an average increase of 3% per year.
 """
     else:
         # Normal flow - both SQL and Python were executed
@@ -501,6 +597,27 @@ We had the following steps:
 {py_result_str}
 
 Provide a concise, friendly explanation of these results for the user.
+
+IMPORTANT OUTPUT FORMATTING:
+- Include a markdown table when the data would benefit from tabular display
+- Keep tables concise (top 10 rows max, or summarize if more)
+- Use clear column headers
+- Add narrative explanation to interpret the table
+- Tables work great for: trends, comparisons, rankings, demographic breakdowns, statistical summaries
+- If a visualization was generated (mentioned in Python output), note that it's displayed below
+
+Example with table and visualization reference:
+## Student Retention Analysis
+
+Here's the retention rate breakdown by demographic group:
+
+| Group | Retention Rate | Sample Size |
+|-------|---------------|-------------|
+| Group A | 87.5% | 1,234 |
+| Group B | 82.3% | 987 |
+| Group C | 91.2% | 756 |
+
+The data reveals that Group C has the highest retention at 91.2%, while Group B shows the lowest at 82.3%. See the visualization below for a visual comparison.
 """
 
     response = client.chat.completions.create(
@@ -544,6 +661,19 @@ For more information, see the README.md file.
 
     # Create OpenAI client with the API key
     client = OpenAI(api_key=active_api_key)
+
+    # RELEVANCE: Check if question is about the database data
+    question_is_relevant, relevance_error = check_question_relevance(user_input, client)
+    if not question_is_relevant:
+        # Question is off-topic (general knowledge, unrelated to data)
+        sql_details = (
+            "### Question Rejected\n\n"
+            "Your question was determined to be outside the scope of this database analysis tool.\n\n"
+            "This interface is designed specifically for analyzing student enrollment, demographics, "
+            "academic performance, and related higher education data.\n\n"
+            "**Please ask questions that can be answered by querying the student database.**"
+        )
+        return relevance_error, sql_details, "Python analysis was not executed because the question was off-topic.", gr.update(visible=False, value=None)
 
     # SECURITY: Check user intent before generating SQL
     intent_is_safe, intent_warning = check_user_intent(user_input)
