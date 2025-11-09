@@ -164,10 +164,15 @@ def run_python_code(py_code, df):
     # This runs BEFORE GPT's code, converting df in place
     forced_prep = """
 # AUTOMATIC CATEGORICAL CONVERSION (runs before your code)
-_categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
-if _categorical_cols:
-    df = pd.get_dummies(df, columns=_categorical_cols, drop_first=True)
-df = df.dropna()  # Also handle missing values
+text_like = df.select_dtypes(include=['object', 'string', 'category']).columns.tolist()
+if text_like:
+    df = pd.get_dummies(df, columns=text_like, drop_first=True)
+
+# after dummies, keep only numeric columns to be extra safe
+df = df.select_dtypes(include=[np.number])
+
+# and only then drop rows with missing numeric data
+df = df.dropna()
 """
 
     # Prepend forced conversion to GPT's code
