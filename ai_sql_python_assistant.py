@@ -26,6 +26,11 @@ from openai import OpenAI
 import gradio as gr
 import pandas as pd
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')  # Non-interactive backend for server
+import matplotlib.pyplot as plt
+import io
+import base64
 
 # Import database setup functions for auto-initialization
 from create_ipeds_db_schema import create_ipeds_db_schema
@@ -144,11 +149,19 @@ def run_sql(sql_query):
 def run_python_code(py_code, df):
     """
     Executes the provided Python code snippet in a restricted local environment
-    containing 'df' (the DataFrame from the SQL step), 'pd' (pandas), and 'np' (numpy).
+    containing 'df' (the DataFrame from the SQL step), 'pd' (pandas), 'np' (numpy),
+    'plt' (matplotlib.pyplot), 'io', and 'base64' for creating embedded charts.
     Expects the code to store its final output in a variable named 'result'.
     Returns a string version of 'result'.
     """
-    local_vars = {"df": df, "pd": pd, "np": np}
+    local_vars = {
+        "df": df,
+        "pd": pd,
+        "np": np,
+        "plt": plt,
+        "io": io,
+        "base64": base64
+    }
     try:
         exec(py_code, {}, local_vars)
         output = local_vars.get("result", "No 'result' variable set.")
@@ -358,12 +371,15 @@ Preview of df:
 
 Write Python code that uses 'df' to further explore or summarize the data.
 
-AVAILABLE LIBRARIES (already imported as 'pd'):
-- pandas (as pd) - for data manipulation
-- numpy (as np) - for numerical operations
-- statsmodels - for regression, statistical models (import as needed)
+AVAILABLE LIBRARIES (already available):
+- pandas (pd) - for data manipulation
+- numpy (np) - for numerical operations
+- matplotlib.pyplot (plt) - for charts
+- io - for byte streams
+- base64 - for encoding images
+- statsmodels - for regression (import as needed)
 - scipy - for scientific computing (import as needed)
-- scikit-learn (sklearn) - for machine learning (import as needed)
+- scikit-learn (sklearn) - for ML (import as needed)
 
 IMPORTANT DATA PREPARATION:
 - Check column data types BEFORE analysis
@@ -372,12 +388,44 @@ IMPORTANT DATA PREPARATION:
 - Ensure numeric columns are float/int types before regression
 - For regression: use pd.get_dummies() for categorical variables
 
+VISUALIZATIONS (when appropriate):
+- Add charts for trends, distributions, comparisons, correlations
+- Use matplotlib to create chart, convert to base64, embed in result
+- Charts enhance understanding for time series, demographics, patterns
+- Don't create charts for simple counts or single values
+
 IMPORTANT OUTPUT:
-- The DataFrame 'df' and pandas module 'pd' are already available
-- For other libraries, include the import statement in your code
 - Store final output in a variable named 'result'
 - Return ONLY the code (no triple backticks, no markdown)
-- Make 'result' a readable string or formatted output, not just a model object
+- Make 'result' a readable string or formatted output
+- Include embedded charts in markdown format when useful
+
+Example for creating an embedded chart:
+# Create visualization
+plt.figure(figsize=(10, 6))
+df.plot(x='year', y='enrollment', kind='line', ax=plt.gca())
+plt.title('Enrollment Trends Over Time')
+plt.xlabel('Year')
+plt.ylabel('Number of Students')
+plt.grid(True, alpha=0.3)
+
+# Convert to base64
+buf = io.BytesIO()
+plt.savefig(buf, format='png', bbox_inches='tight', dpi=100)
+buf.seek(0)
+img_base64 = base64.b64encode(buf.read()).decode('utf-8')
+plt.close()
+
+# Build result with embedded image
+result = f\"\"\"## Enrollment Analysis
+
+Total students: {{len(df)}}
+
+### Trend Visualization
+![Enrollment Trend](data:image/png;base64,{{img_base64}})
+
+The chart shows enrollment patterns over the analyzed period.
+\"\"\"
 
 Example for regression with categorical variables:
 import statsmodels.api as sm
@@ -400,7 +448,7 @@ y = df_analysis['target_column']
 model = sm.OLS(y, sm.add_constant(X)).fit()
 result = model.summary().as_text()
 
-Example for simple statistics (no statsmodels needed):
+Example for simple statistics:
 # Calculate correlation matrix
 numeric_cols = df.select_dtypes(include=['number']).columns
 correlation = df[numeric_cols].corr()
