@@ -150,50 +150,50 @@ def run_python_code(py_code, df):
     containing 'df' (the DataFrame from the SQL step), 'pd' (pandas), 'np' (numpy),
     'plt' (matplotlib.pyplot), 'tempfile', and 'os' for creating charts.
 
-    IMPORTANT: Automatically prepends categorical conversion code before GPT's code.
-    This ensures statsmodels/sklearn always get numeric data, even if GPT forgets.
+    We prepend a defensive data prep block that:
+    - finds text-like columns (object, string, category)
+    - protects time-like columns from being one-hot encoded
+    - dummies only the true categoricals
+    - keeps only numeric columns plus preserved time columns
+    - drops rows with missing values
 
-    Expects the code to store its final output in a variable named 'result'.
-    Optionally, the code can store a chart file path in 'result_image'.
-    Returns a tuple: (result_text, image_path or None)
+    Then we run the model generated code.
     """
     import tempfile
     import os
 
-    # FORCE categorical conversion by prepending to GPT's code
-    # This runs BEFORE GPT's code, converting df in place
     forced_prep = """
 # AUTOMATIC CATEGORICAL CONVERSION (runs before your code)
-# Identify text-like columns
+
+# 1. find text-like columns
 _text_like = df.select_dtypes(include=['object', 'string', 'category']).columns.tolist()
 
-# Separate time-related columns from true categorical columns
+# 2. define what looks like a time column
 _time_keywords = ('term', 'year', 'date', 'semester', 'quarter', 'month', 'day', 'time', 'period')
+
 _columns_to_convert = []
 _time_columns = []
 
-for col in _text_like:
-    col_lower = col.lower()
-    is_time_col = any(keyword in col_lower for keyword in _time_keywords)
-    if is_time_col:
-        _time_columns.append(col)
+for _col in _text_like:
+    _is_time_col = any(keyword in _col.lower() for keyword in _time_keywords)
+    if _is_time_col:
+        _time_columns.append(_col)
     else:
-        _columns_to_convert.append(col)
+        _columns_to_convert.append(_col)
 
-# Convert only true categorical columns (gender, race, program, etc.) to dummies
+# 3. dummy only real categoricals
 if _columns_to_convert:
     df = pd.get_dummies(df, columns=_columns_to_convert, drop_first=True)
 
-# Keep only numeric columns plus preserved time columns
+# 4. keep numeric plus time-like columns that we explicitly preserved
 _numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-_keep_cols = _numeric_cols + [col for col in _time_columns if col in df.columns]
+_keep_cols = _numeric_cols + [c for c in _time_columns if c in df.columns]
 df = df[_keep_cols]
 
-# Drop rows with missing data
+# 5. drop rows with missing data
 df = df.dropna()
 """
 
-    # Prepend forced conversion to GPT's code
     full_code = forced_prep + "\n" + py_code
 
     local_vars = {
@@ -202,14 +202,16 @@ df = df.dropna()
         "np": np,
         "plt": plt,
         "tempfile": tempfile,
-        "os": os
+        "os": os,
     }
+
     try:
         exec(full_code, {}, local_vars)
         output = local_vars.get("result", "No 'result' variable set.")
         image_path = local_vars.get("result_image", None)
         return str(output), image_path
     except Exception as e:
+        # if the model code failed only on the plotting step, this will surface it cleanly
         return f"Python Error: {str(e)}", None
 
 ###############################################################################
@@ -520,8 +522,8 @@ YOU MUST START EVERY ANALYSIS WITH THIS DATA PREPARATION BLOCK:
 # MANDATORY: Check and convert data types
 df_analysis = df.copy()
 
-# Identify categorical columns (object/string types)
-categorical_cols = df_analysis.select_dtypes(include=['object']).columns.tolist()
+# Identify categorical columns (object/string/category types)
+categorical_cols = df_analysis.select_dtypes(include=['object', 'string', 'category']).columns.tolist()
 
 # Convert categorical to numeric using dummy variables
 if categorical_cols:
@@ -555,7 +557,7 @@ import os
 
 # STEP 1: MANDATORY DATA PREP (ALWAYS DO THIS FIRST)
 df_analysis = df.copy()
-categorical_cols = df_analysis.select_dtypes(include=['object']).columns.tolist()
+categorical_cols = df_analysis.select_dtypes(include=['object', 'string', 'category']).columns.tolist()
 if categorical_cols:
     df_analysis = pd.get_dummies(df_analysis, columns=categorical_cols, drop_first=True)
 df_analysis = df_analysis.dropna()
@@ -594,7 +596,7 @@ plt.close()
 CORRELATION EXAMPLE (simpler, but still needs categorical handling):
 # MANDATORY: Convert categorical columns first
 df_analysis = df.copy()
-categorical_cols = df_analysis.select_dtypes(include=['object']).columns.tolist()
+categorical_cols = df_analysis.select_dtypes(include=['object', 'string', 'category']).columns.tolist()
 if categorical_cols:
     df_analysis = pd.get_dummies(df_analysis, columns=categorical_cols, drop_first=True)
 df_analysis = df_analysis.dropna()
