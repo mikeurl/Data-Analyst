@@ -459,12 +459,29 @@ AVAILABLE LIBRARIES (already available):
 - scipy - for scientific computing (import as needed)
 - scikit-learn (sklearn) - for ML (import as needed)
 
-IMPORTANT DATA PREPARATION:
-- Check column data types BEFORE analysis
-- Convert categorical/string columns to numeric using pd.get_dummies() or label encoding
-- Handle missing values (dropna() or fillna())
-- Ensure numeric columns are float/int types before regression
-- For regression: use pd.get_dummies() for categorical variables
+🚨 CRITICAL: CATEGORICAL VARIABLE HANDLING 🚨
+STATSMODELS AND SKLEARN WILL FAIL IF YOU PASS STRING/OBJECT COLUMNS!
+
+YOU MUST START EVERY ANALYSIS WITH THIS DATA PREPARATION BLOCK:
+```
+# MANDATORY: Check and convert data types
+df_analysis = df.copy()
+
+# Identify categorical columns (object/string types)
+categorical_cols = df_analysis.select_dtypes(include=['object']).columns.tolist()
+
+# Convert categorical to numeric using dummy variables
+if categorical_cols:
+    print(f"Converting categorical columns: {{categorical_cols}}")
+    df_analysis = pd.get_dummies(df_analysis, columns=categorical_cols, drop_first=True)
+
+# Handle missing values
+df_analysis = df_analysis.dropna()
+
+# Now df_analysis contains ONLY numeric columns - safe for regression/correlation
+```
+
+THIS IS NOT OPTIONAL. Every regression, correlation, or statistical analysis REQUIRES this block.
 
 VISUALIZATIONS (when appropriate):
 - Add charts for trends, distributions, comparisons, correlations
@@ -478,58 +495,59 @@ IMPORTANT OUTPUT:
 - Return ONLY the code (no triple backticks, no markdown)
 - Make 'result' a readable string or formatted output
 
-Example for creating a visualization:
+COMPLETE REGRESSION EXAMPLE (USE THIS PATTERN):
+import statsmodels.api as sm
 import tempfile
 import os
 
-# Create visualization
-plt.figure(figsize=(10, 6))
-df.plot(x='year', y='enrollment', kind='line', ax=plt.gca())
-plt.title('Enrollment Trends Over Time')
-plt.xlabel('Year')
-plt.ylabel('Number of Students')
-plt.grid(True, alpha=0.3)
-
-# Save to temp file
-temp_dir = tempfile.gettempdir()
-result_image = os.path.join(temp_dir, f'chart_{{hash(str(df.values.tobytes()))}}.png')
-plt.savefig(result_image, format='png', bbox_inches='tight', dpi=100)
-plt.close()
-
-# Build result text
-result = f\"\"\"## Enrollment Analysis
-
-Total students: {{len(df)}}
-
-The chart shows enrollment patterns over the analyzed period.
-See visualization below.
-\"\"\"
-
-Example for regression with categorical variables:
-import statsmodels.api as sm
-
-# Prepare data - convert categoricals to dummies
+# STEP 1: MANDATORY DATA PREP (ALWAYS DO THIS FIRST)
 df_analysis = df.copy()
 categorical_cols = df_analysis.select_dtypes(include=['object']).columns.tolist()
 if categorical_cols:
     df_analysis = pd.get_dummies(df_analysis, columns=categorical_cols, drop_first=True)
-
-# Handle missing values
 df_analysis = df_analysis.dropna()
 
-# Select features and target
-feature_cols = [col for col in df_analysis.columns if col != 'target_column']
-X = df_analysis[feature_cols]
-y = df_analysis['target_column']
+# STEP 2: Select target and features (now all numeric)
+y = df_analysis['retention_flag']  # or whatever target
+X = df_analysis.drop('retention_flag', axis=1)  # all other columns as features
 
-# Run regression
-model = sm.OLS(y, sm.add_constant(X)).fit()
-result = model.summary().as_text()
+# STEP 3: Run regression
+X = sm.add_constant(X)
+model = sm.OLS(y, X).fit()
 
-Example for simple statistics:
-# Calculate correlation matrix
-numeric_cols = df.select_dtypes(include=['number']).columns
-correlation = df[numeric_cols].corr()
+# STEP 4: Format results
+result = f\"\"\"## Regression Results
+
+{{model.summary().as_text()}}
+
+### Key Predictors:
+The most significant predictors are shown in the coefficient table above.
+Look for low p-values (< 0.05) to identify strong predictors.
+\"\"\"
+
+# STEP 5: Optional - create visualization
+plt.figure(figsize=(12, 6))
+coefficients = model.params[1:]  # exclude constant
+coefficients.sort_values().plot(kind='barh')
+plt.title('Feature Coefficients - Predictors of Retention')
+plt.xlabel('Coefficient Value')
+plt.tight_layout()
+
+temp_dir = tempfile.gettempdir()
+result_image = os.path.join(temp_dir, f'regression_{{hash(str(df.values.tobytes()))}}.png')
+plt.savefig(result_image, format='png', bbox_inches='tight', dpi=100)
+plt.close()
+
+CORRELATION EXAMPLE (simpler, but still needs categorical handling):
+# MANDATORY: Convert categorical columns first
+df_analysis = df.copy()
+categorical_cols = df_analysis.select_dtypes(include=['object']).columns.tolist()
+if categorical_cols:
+    df_analysis = pd.get_dummies(df_analysis, columns=categorical_cols, drop_first=True)
+df_analysis = df_analysis.dropna()
+
+# Now calculate correlation on all-numeric data
+correlation = df_analysis.corr()
 result = correlation.to_string()
 """
     response = client.chat.completions.create(
