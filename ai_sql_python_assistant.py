@@ -216,38 +216,38 @@ DATABASE SCHEMA:
 USER'S QUESTION:
 {user_input}
 
-TASK: Determine if this question can be answered using the database.
+TASK: Determine if this question is RELATED TO student/education data, even if specific fields don't exist.
 
-IMPORTANT: Be permissive - when in doubt, say YES. Only reject obviously off-topic questions.
+CRITICAL: If the question is ABOUT student data, enrollment, demographics, or education - say YES.
+Even if specific requested fields aren't in the database, we'll answer with available data.
 
-DEFINITELY ACCEPT questions about:
-- Student enrollment, counts, demographics (even specific terms like "Fall 2024")
-- Academic performance, GPA, grades, retention, graduation
-- Programs, majors, class years, terms, semesters
-- Statistics, trends, comparisons, correlations from student data
-- ANY analysis that could reasonably involve student database queries
-- Questions about specific time periods, cohorts, or subgroups
+DEFINITELY ACCEPT:
+- ANY question about students, enrollment, academics, retention, graduation
+- Questions asking for data fields that don't exist (we'll explain what IS available)
+- Questions about demographics, even if specific fields aren't tracked
+- ANY reasonable question related to higher education data analysis
 
-ONLY REJECT questions that are:
-- Obviously general knowledge (e.g., "What is the capital of France?")
-- Pure math problems unrelated to data (e.g., "What is 15 + 27?")
-- About completely different domains (e.g., "How do I bake a cake?")
-- Clearly not about higher education or student data
+Example - question asks about "country of origin" but that field doesn't exist:
+- Still say YES! We'll answer with available demographic data and note the limitation.
+
+ONLY REJECT if question is clearly NOT about student/education data:
+- General knowledge (e.g., "What is the capital of France?")
+- Unrelated topics (e.g., "How do I cook pasta?")
+- Pure math (e.g., "What is 15 + 27?")
 
 Examples that SHOULD be accepted:
+- "What are retention rates by country of origin?" ✅ YES (even if country field missing)
 - "How many students were enrolled in Fall 2024?" ✅ YES
-- "What are the retention rates?" ✅ YES
-- "Show me GPA trends" ✅ YES
-- "Which program has the most students?" ✅ YES
+- "Show me students by socioeconomic status" ✅ YES (even if that field missing)
+- "What predicts student success?" ✅ YES
 
 Examples that SHOULD be rejected:
 - "What is the capital of France?" ❌ NO (general knowledge)
-- "How do I cook pasta?" ❌ NO (unrelated topic)
-- "What is 2 + 2?" ❌ NO (pure math)
+- "How do I cook pasta?" ❌ NO (unrelated)
 
 Respond with ONLY:
-YES - if the question is about data in the database (default to YES when uncertain)
-NO - if the question is obviously off-topic
+YES - if question is about student/education data (even if specific fields unavailable)
+NO - if question is clearly unrelated to education data
 
 Then on a new line, briefly explain your reasoning (1 sentence).
 """
@@ -268,22 +268,20 @@ Then on a new line, briefly explain your reasoning (1 sentence).
     if not is_relevant:
         error_message = f"""🤔 **Question Outside Database Scope**
 
-Your question doesn't appear to be about the student data in this database.
+Your question doesn't appear to be about student or education data.
 
 **Reason:** {reason}
 
-**This tool can answer questions like:**
-- "How many students are enrolled?"
-- "What are the retention rates by demographics?"
-- "Show me GPA trends over time"
-- "Which programs have the highest graduation rates?"
+**This tool is designed for questions about:**
+- Student enrollment, demographics, and academic performance
+- Retention, graduation, and success metrics
+- Program analysis and trends
 
 **This tool cannot answer:**
 - General knowledge questions
-- Math problems unrelated to the data
-- Questions about topics outside higher education student data
+- Questions about unrelated topics
 
-Please ask a question about the student enrollment, demographics, academic performance, or related data in the database.
+Please ask a question related to student or education data.
 """
         return False, error_message
 
@@ -614,6 +612,12 @@ Note: Python analysis was determined to be unnecessary for this straightforward 
 
 Provide a concise, friendly explanation of these SQL results for the user. Answer their question directly based on the data shown.
 
+HANDLING MISSING DATA FIELDS:
+- If the user asked for data fields that don't exist in the database, acknowledge this gracefully
+- Provide what data IS available that's related to their question
+- Suggest similar/alternative data that might be helpful
+- Example: "While we don't track country of origin, here are retention rates by the demographics we do track: race/ethnicity, gender, and program."
+
 IMPORTANT OUTPUT FORMATTING:
 - Include a markdown table when the data would benefit from tabular display
 - Keep tables concise (top 10 rows max, or summarize if more)
@@ -633,6 +637,18 @@ Here are the enrollment numbers over the past 5 years:
 | 2022 | 5,589     | +2.4%  |
 
 The data shows steady growth with an average increase of 3% per year.
+
+Example with missing field:
+## Retention Analysis
+
+Note: While we don't have data on country of origin, here's what we can show about retention rates:
+
+| Demographic | Retention Rate |
+|-------------|---------------|
+| By Gender   | ...           |
+| By Race     | ...           |
+
+Available demographic fields include: gender, race/ethnicity, program, and class year.
 """
     else:
         # Normal flow - both SQL and Python were executed
@@ -652,6 +668,12 @@ We had the following steps:
 {py_result_str}
 
 Provide a concise, friendly explanation of these results for the user.
+
+HANDLING MISSING DATA FIELDS:
+- If the user asked for data fields that don't exist, acknowledge this gracefully
+- Provide analysis using available fields instead
+- Note what fields ARE available that relate to their question
+- Example: "While country of origin isn't tracked, the regression used available demographics (gender, race, program) to predict retention."
 
 IMPORTANT OUTPUT FORMATTING:
 - Include a markdown table when the data would benefit from tabular display
