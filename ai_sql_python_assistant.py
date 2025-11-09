@@ -540,7 +540,7 @@ Steps to get started:
 
 For more information, see the README.md file.
 """
-        return message, "Awaiting a valid API key to generate SQL details.", "Awaiting a valid API key to generate Python details.", None
+        return message, "Awaiting a valid API key to generate SQL details.", "Awaiting a valid API key to generate Python details.", gr.update(visible=False, value=None)
 
     # Create OpenAI client with the API key
     client = OpenAI(api_key=active_api_key)
@@ -566,7 +566,7 @@ For more information, see the README.md file.
             "- 'List all records where...'\n"
             "- 'Analyze trends in...'"
         )
-        return intent_warning, sql_details, "Python analysis was not executed because the request was blocked.", None
+        return intent_warning, sql_details, "Python analysis was not executed because the request was blocked.", gr.update(visible=False, value=None)
 
     # Step A: GPT for SQL
     raw_sql_code = ask_gpt_for_sql(user_input, client)
@@ -591,7 +591,7 @@ For more information, see the README.md file.
             "- ALTER, TRUNCATE, GRANT, REVOKE\n"
             "- ATTACH, DETACH, PRAGMA, EXECUTE"
         )
-        return explanation, sql_details, "Python analysis was not executed because the SQL was blocked for security reasons.", None
+        return explanation, sql_details, "Python analysis was not executed because the SQL was blocked for security reasons.", gr.update(visible=False, value=None)
 
     # Execute
     df_or_error = run_sql(sql_code_clean)
@@ -604,7 +604,7 @@ For more information, see the README.md file.
             "### Error\n"
             f"{df_or_error}"
         )
-        return explanation, sql_details, "Python analysis was not executed because the SQL step failed.", None
+        return explanation, sql_details, "Python analysis was not executed because the SQL step failed.", gr.update(visible=False, value=None)
 
     # Build a short preview of the DataFrame
     if isinstance(df_or_error, pd.DataFrame):
@@ -674,7 +674,13 @@ For more information, see the README.md file.
             f"```\n{py_result}\n```"
         )
 
-    return summary_tab, sql_tab, python_tab, image_path
+    # Control image visibility based on whether visualization was generated
+    if image_path:
+        image_output = gr.update(visible=True, value=image_path)
+    else:
+        image_output = gr.update(visible=False, value=None)
+
+    return summary_tab, sql_tab, python_tab, image_output
 
 def main():
     """Launch the Gradio web interface for the AI assistant."""
@@ -1210,7 +1216,7 @@ Do not deploy with real student data without implementing:
                 # Visualization output (when Python generates charts)
                 image_output = gr.Image(
                     label="Visualization",
-                    visible=True,
+                    visible=False,  # Hidden until visualization is generated
                     show_label=True,
                     type="filepath"
                 )
