@@ -164,33 +164,26 @@ def run_python_code(py_code, df):
 
     forced_prep = """
 # AUTOMATIC CATEGORICAL CONVERSION (runs before your code)
+import re
 
-# 1. find text-like columns
-_text_like = df.select_dtypes(include=['object', 'string', 'category']).columns.tolist()
+# Get all text columns
+_text_cols = df.select_dtypes(include=['object', 'string', 'category']).columns.tolist()
 
-# 2. define what looks like a time column
-_time_keywords = ('term', 'year', 'date', 'semester', 'quarter', 'month', 'day', 'time', 'period')
+# Identify time-related columns by checking column names
+_time_pattern = re.compile(r'term|year|date|semester|quarter|month|day|time|period', re.IGNORECASE)
+_time_cols = [col for col in _text_cols if _time_pattern.search(col)]
+_cat_cols = [col for col in _text_cols if col not in _time_cols]
 
-_columns_to_convert = []
-_time_columns = []
+# Convert only non-time categorical columns to dummies
+if _cat_cols:
+    df = pd.get_dummies(df, columns=_cat_cols, drop_first=True)
 
-for _col in _text_like:
-    _is_time_col = any(keyword in _col.lower() for keyword in _time_keywords)
-    if _is_time_col:
-        _time_columns.append(_col)
-    else:
-        _columns_to_convert.append(_col)
+# Keep numeric columns and preserved time columns
+_num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+_final_cols = _num_cols + [col for col in _time_cols if col in df.columns]
+df = df[_final_cols]
 
-# 3. dummy only real categoricals
-if _columns_to_convert:
-    df = pd.get_dummies(df, columns=_columns_to_convert, drop_first=True)
-
-# 4. keep numeric plus time-like columns that we explicitly preserved
-_numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-_keep_cols = _numeric_cols + [c for c in _time_columns if c in df.columns]
-df = df[_keep_cols]
-
-# 5. drop rows with missing data
+# Drop missing values
 df = df.dropna()
 """
 
