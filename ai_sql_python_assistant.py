@@ -164,24 +164,30 @@ def run_python_code(py_code, df):
     # This runs BEFORE GPT's code, converting df in place
     forced_prep = """
 # AUTOMATIC CATEGORICAL CONVERSION (runs before your code)
-# Identify text-like columns, but preserve time-related columns
-text_like = df.select_dtypes(include=['object', 'string', 'category']).columns.tolist()
+# Identify text-like columns
+_text_like = df.select_dtypes(include=['object', 'string', 'category']).columns.tolist()
 
-# Don't convert time-related columns to dummies (needed for trends/time series)
-time_related_keywords = ['term', 'year', 'date', 'semester', 'quarter', 'month', 'day', 'time', 'period']
-columns_to_convert = [col for col in text_like
-                      if not any(keyword in col.lower() for keyword in time_related_keywords)]
+# Separate time-related columns from true categorical columns
+_time_keywords = ('term', 'year', 'date', 'semester', 'quarter', 'month', 'day', 'time', 'period')
+_columns_to_convert = []
+_time_columns = []
+
+for col in _text_like:
+    col_lower = col.lower()
+    is_time_col = any(keyword in col_lower for keyword in _time_keywords)
+    if is_time_col:
+        _time_columns.append(col)
+    else:
+        _columns_to_convert.append(col)
 
 # Convert only true categorical columns (gender, race, program, etc.) to dummies
-if columns_to_convert:
-    df = pd.get_dummies(df, columns=columns_to_convert, drop_first=True)
+if _columns_to_convert:
+    df = pd.get_dummies(df, columns=_columns_to_convert, drop_first=True)
 
-# After dummies, keep only numeric columns plus preserved time columns
-numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-preserved_time_cols = [col for col in text_like
-                       if any(keyword in col.lower() for keyword in time_related_keywords)
-                       and col in df.columns]
-df = df[numeric_cols + preserved_time_cols]
+# Keep only numeric columns plus preserved time columns
+_numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+_keep_cols = _numeric_cols + [col for col in _time_columns if col in df.columns]
+df = df[_keep_cols]
 
 # Drop rows with missing data
 df = df.dropna()
