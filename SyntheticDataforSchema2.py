@@ -343,10 +343,13 @@ def generate_stable_population_data(
 
             # Insert enrollment row with class year AT TIME OF ENROLLMENT
             # (not the advanced class year for next term)
+            # term_start_date is the first day of the Fall semester (Sept 1)
+            term_start_date = f"{term_year}-09-01"
             enrollment_rows.append((
                 enrollment_id_counter,
                 s["student_id"],
                 term_label,
+                term_start_date,         # ISO date for julianday() calculations
                 program,
                 status,
                 retained_next_term,      # 1 if returning next term, 0 if leaving
@@ -376,18 +379,19 @@ def generate_stable_population_data(
         VALUES (?, ?, ?, ?, ?, ?);
     """, student_data)
 
-    # (B) Insert enrollments (with class_year + avg_gpa)
+    # (B) Insert enrollments (with class_year + avg_gpa + term_start_date)
     c.executemany("""
         INSERT INTO enrollments(
-            enrollment_id, 
-            student_id, 
-            term, 
-            program, 
-            status, 
+            enrollment_id,
+            student_id,
+            term,
+            term_start_date,
+            program,
+            status,
             retained_next_term,
             class_year,
             avg_gpa
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
     """, enrollment_rows)
 
     # (C) Insert course_enrollments

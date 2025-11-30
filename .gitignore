@@ -51,9 +51,17 @@ venv.bak/
 translation_*.csv
 synthetic_*.csv
 ipeds_data.db
+*.db.lock
 
 # Logs
 *.log
+
+# Pytest
+.pytest_cache/
+pytest_cache/
+.coverage
+htmlcov/
+.tox/
 
 # Gradio cache
 gradio_cached_examples/
