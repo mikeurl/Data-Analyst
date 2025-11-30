@@ -63,6 +63,7 @@ def create_ipeds_db_schema(db_path="ipeds_data.db"):
         enrollment_id INTEGER PRIMARY KEY,
         student_id INTEGER,
         term TEXT,
+        term_start_date TEXT,          -- ISO date format (YYYY-MM-DD) for date calculations
         program TEXT,
         status TEXT,
         retained_next_term INTEGER,   -- 0/1
