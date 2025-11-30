@@ -21,27 +21,106 @@ this disparity serves your analysis goals.
 import sqlite3
 import random
 import datetime
+import os
+from typing import Dict, List, Tuple, Optional
 
-DB_PATH = "ipeds_data.db"
+# Use environment variable for DB path, with fallback to default
+DB_PATH = os.getenv("IPEDS_DB_PATH", "ipeds_data.db")
+
+###############################################################################
+# CONSTANTS - Extracted magic numbers for configurability
+###############################################################################
+
+# Student age range (in years)
+MIN_STUDENT_AGE = 18
+MAX_STUDENT_AGE = 22
+
+# Grade distribution (letter grade, probability)
+DEFAULT_GRADE_DISTRIBUTION: List[Tuple[str, float]] = [
+    ("A", 0.25),
+    ("B", 0.35),
+    ("C", 0.25),
+    ("D", 0.10),
+    ("F", 0.05),
+]
+
+# Grade to GPA mapping
+GRADE_TO_GPA: Dict[str, float] = {
+    "A": 4.0,
+    "B": 3.0,
+    "C": 2.0,
+    "D": 1.0,
+    "F": 0.0,
+}
+
+# GPA thresholds for retention probability
+GPA_RETENTION_THRESHOLDS: List[Tuple[float, float]] = [
+    (3.5, 0.90),  # GPA >= 3.5: 90% retention
+    (2.5, 0.75),  # GPA >= 2.5: 75% retention
+    (1.5, 0.55),  # GPA >= 1.5: 55% retention
+    (0.5, 0.35),  # GPA >= 0.5: 35% retention
+    (0.0, 0.15),  # GPA < 0.5: 15% retention
+]
+
+# Default GPA when no courses taken (should be rare)
+DEFAULT_GPA = 2.0
+
+# Freshman variation range
+FRESHMAN_VARIATION = 20
+
+# Available demographics
+GENDERS = ["Male", "Female"]
+RACE_CATEGORIES = [
+    "White",
+    "Black/African American",
+    "Hispanic/Latino",
+    "Asian",
+    "Two or More Races",
+    "Other/Unknown",
+]
+FIRST_NAMES = [
+    "John", "Mike", "David", "Chris", "James",
+    "Mary", "Linda", "Jennifer", "Susan", "Elizabeth",
+]
+LAST_NAMES = [
+    "Smith", "Jones", "Brown", "Johnson", "Miller",
+    "Davis", "Garcia", "Taylor", "Wilson", "Hernandez",
+]
+PROGRAMS = ["11.0101", "24.0101", "52.0301", "14.0901"]
+AWARD_TYPES = ["Bachelor's", "Associate", "Certificate <1 year"]
+
+# Course catalog
+DEFAULT_COURSES: List[Tuple[str, str, int]] = [
+    ("CSCI 101", "Intro to CS", 3),
+    ("MATH 101", "College Algebra", 3),
+    ("ENG 101", "English Composition", 3),
+    ("HIST 210", "World History", 3),
+    ("BIO 110", "General Biology", 4),
+    ("PSYC 101", "Intro to Psychology", 3),
+    ("ECON 101", "Principles of Econ", 3),
+    ("CHEM 101", "General Chemistry", 4),
+    ("PHYS 101", "General Physics", 4),
+    ("PHIL 100", "Intro to Philosophy", 3),
+]
 
 def generate_stable_population_data(
-    total_years=8,
-    start_fall_year=2019,
-    new_freshmen_each_fall=250,        # Base number of new freshmen
-    freshman_to_soph_prob=0.80,        # Probability freshman advances to sophomore
-    soph_to_junior_prob=0.85,          # Probability sophomore advances to junior
-    junior_to_senior_prob=0.90,        # Probability junior advances to senior
-    senior_grad_prob=0.70,             # Probability senior graduates
-    race_penalty_for_retention=0.05,   # Retention penalty for underrepresented students
-    random_retention=False,            # Use random retention (legacy parameter)
-    base_dropout_prob=0.05,            # Fallback dropout probability
-    random_seed=42                     # Random seed for reproducibility
-):
+    total_years: int = 8,
+    start_fall_year: int = 2019,
+    new_freshmen_each_fall: int = 250,
+    freshman_to_soph_prob: float = 0.80,
+    soph_to_junior_prob: float = 0.85,
+    junior_to_senior_prob: float = 0.90,
+    senior_grad_prob: float = 0.70,
+    race_penalty_for_retention: float = 0.05,
+    base_dropout_prob: float = 0.05,
+    random_seed: int = 42,
+    db_path: Optional[str] = None,
+) -> None:
     """
-    Generates multi-year student population data with realistic progression patterns.
+    Generate multi-year student population data with realistic progression patterns.
 
     This function creates a synthetic student population over multiple Fall terms with:
-    - New freshman cohorts each year (with ±20 variation)
+    - New freshman cohorts each year (with ±FRESHMAN_VARIATION variation)
     - GPA-based retention modeling
     - Class year progression (Freshman → Sophomore → Junior → Senior)
     - Course enrollments with letter grades
@@ -57,76 +136,52 @@ def generate_stable_population_data(
         senior_grad_prob: Probability of senior graduating (default: 0.70)
         race_penalty_for_retention: Retention penalty applied to certain demographics
                                     (default: 0.05). Set to 0 to remove disparity.
-        random_retention: Legacy parameter, not currently used
         base_dropout_prob: Fallback dropout probability (default: 0.05)
         random_seed: Random seed for reproducibility (default: 42)
+        db_path: Path to the database (default: uses DB_PATH constant)
 
     Returns:
-        None. Data is written directly to the SQLite database specified by DB_PATH.
+        None. Data is written directly to the SQLite database.
 
     Database Requirements:
         The enrollments table must include 'class_year' and 'avg_gpa' columns.
         Run create_ipeds_db_schema.py first to create the proper schema.
     """
+    # Use provided db_path or fall back to module constant
+    effective_db_path = db_path or DB_PATH
 
     random.seed(random_seed)
 
     # 1) Connect to DB & enable foreign keys
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(effective_db_path)
     conn.execute("PRAGMA foreign_keys = ON;")
     c = conn.cursor()
 
     # 2) Define our Fall terms
-    term_labels = []
-    current_year = start_fall_year
-    for _ in range(total_years):
-        term_labels.append(f"Fall {current_year}")
-        current_year += 1
+    term_labels = [f"Fall {start_fall_year + i}" for i in range(total_years)]
 
-    # 3) Possibly insert some courses if not present
-    possible_courses = [
-        ("CSCI 101", "Intro to CS", 3),
-        ("MATH 101", "College Algebra", 3),
-        ("ENG 101",  "English Composition", 3),
-        ("HIST 210", "World History", 3),
-        ("BIO 110",  "General Biology", 4),
-        ("PSYC 101", "Intro to Psychology", 3),
-        ("ECON 101", "Principles of Econ", 3),
-        ("CHEM 101", "General Chemistry", 4),
-        ("PHYS 101", "General Physics", 4),
-        ("PHIL 100", "Intro to Philosophy", 3)
-    ]
+    # 3) Insert courses if not present
     c.executemany("""
         INSERT OR IGNORE INTO courses(course_id, course_code, course_name, credit_hours)
         VALUES (?, ?, ?, ?);
     """, [
-        (i+1, pc[0], pc[1], pc[2]) for i, pc in enumerate(possible_courses)
+        (i + 1, code, name, credits)
+        for i, (code, name, credits) in enumerate(DEFAULT_COURSES)
     ])
     conn.commit()
 
     # Build a dict: { course_id: (course_code, course_name, credit_hours) }
-    course_dict = {}
-    for i, (code, name, ch) in enumerate(possible_courses):
-        course_id = i+1
-        course_dict[course_id] = (code, name, ch)
+    course_dict = {
+        i + 1: (code, name, credits)
+        for i, (code, name, credits) in enumerate(DEFAULT_COURSES)
+    }
 
-    # 4) Weighted letter distribution & mapping
-    letter_dist = [("A", 0.25), ("B", 0.35), ("C", 0.25), ("D", 0.10), ("F", 0.05)]
-    letter_to_gpa = {"A":4.0, "B":3.0, "C":2.0, "D":1.0, "F":0.0}
-
-    # We'll define a piecewise GPA->retention function
-    def map_gpa_to_retention_prob(gpa):
-        # e.g. 3.5+ => 0.90, 2.5+ => 0.75, 1.5+ => 0.55, 0.5+ => 0.35, else => 0.15
-        if gpa >= 3.5:
-            return 0.90
-        elif gpa >= 2.5:
-            return 0.75
-        elif gpa >= 1.5:
-            return 0.55
-        elif gpa >= 0.5:
-            return 0.35
-        else:
-            return 0.15
+    def map_gpa_to_retention_prob(gpa: float) -> float:
+        """Map GPA to retention probability using configured thresholds."""
+        for threshold, prob in GPA_RETENTION_THRESHOLDS:
+            if gpa >= threshold:
+                return prob
+        return GPA_RETENTION_THRESHOLDS[-1][1]  # Return lowest probability
 
     # We'll keep a list of all students in memory
     student_records = []
@@ -143,25 +198,27 @@ def generate_stable_population_data(
     completion_id_counter = 1
 
     # 5) For each fall term...
-    for term_label in term_labels:
-        # (A) Add new freshmen with random ±20 variation
-        variation = random.randint(-20, 20)
+    for term_index, term_label in enumerate(term_labels):
+        # (A) Add new freshmen with random variation
+        variation = random.randint(-FRESHMAN_VARIATION, FRESHMAN_VARIATION)
         new_fresh_count = max(0, new_freshmen_each_fall + variation)
+
+        # Calculate appropriate base date for this term
+        term_year = start_fall_year + term_index
+        base_date = datetime.date(term_year, 9, 1)  # Fall semester start
 
         for _ in range(new_fresh_count):
             sid = next_student_id
             next_student_id += 1
 
-            # Random personal data
-            genders = ["Male","Female"]
-            gender = random.choice(genders)
-            fname = random.choice(["John","Mike","David","Chris","James","Mary","Linda","Jennifer","Susan","Elizabeth"])
-            lname = random.choice(["Smith","Jones","Brown","Johnson","Miller","Davis","Garcia","Taylor","Wilson","Hernandez"])
-            race_cats = ["White","Black/African American","Hispanic/Latino","Asian","Two or More Races","Other/Unknown"]
-            race = random.choice(race_cats)
+            # Random personal data using constants
+            gender = random.choice(GENDERS)
+            fname = random.choice(FIRST_NAMES)
+            lname = random.choice(LAST_NAMES)
+            race = random.choice(RACE_CATEGORIES)
 
-            base_date = datetime.date(2025,1,7)
-            age_days = random.randint(18*365, 22*365)
+            # Calculate DOB based on student age range
+            age_days = random.randint(MIN_STUDENT_AGE * 365, MAX_STUDENT_AGE * 365)
             dob = base_date - datetime.timedelta(days=age_days)
             dob_str = dob.strftime("%Y-%m-%d")
 
@@ -184,37 +241,38 @@ def generate_stable_population_data(
                 continue
 
             # Program CIP code
-            program = random.choice(["11.0101","24.0101","52.0301","14.0901"])
+            program = random.choice(PROGRAMS)
             status = "Active"
 
-            # Generate courses for this term
-            num_courses = random.randint(2,5)
+            # Generate courses for this term (2-5 courses)
+            num_courses = random.randint(2, 5)
             course_ids = list(course_dict.keys())
-            chosen_cids = random.sample(course_ids, num_courses)
+            chosen_cids = random.sample(course_ids, min(num_courses, len(course_ids)))
 
-            # We'll compute sum of (grade_points * credit_hrs) / sum(credit_hrs) for the GPA
+            # Compute weighted GPA: sum(grade_points * credit_hrs) / sum(credit_hrs)
             sum_gp = 0.0
             sum_credits = 0.0
 
             # Insert rows in course_enrollments
             enrollment_id = enrollment_id_counter
             for cid in chosen_cids:
-                # pick a letter grade
+                # Pick a letter grade using weighted distribution
                 r = random.random()
                 cum = 0.0
-                letter_grade = "C"
-                for (lg, p) in letter_dist:
+                letter_grade = "C"  # default fallback
+                for (lg, p) in DEFAULT_GRADE_DISTRIBUTION:
                     cum += p
                     if r <= cum:
                         letter_grade = lg
                         break
-                gp = letter_to_gpa[letter_grade]
+
+                gp = GRADE_TO_GPA[letter_grade]
                 credit_hrs = course_dict[cid][2]
 
                 sum_gp += (gp * credit_hrs)
                 sum_credits += credit_hrs
 
-                # record course enrollment
+                # Record course enrollment
                 course_enrollment_rows.append((
                     course_enroll_id_counter,
                     enrollment_id,
@@ -224,41 +282,53 @@ def generate_stable_population_data(
                 ))
                 course_enroll_id_counter += 1
 
-            avg_gpa = sum_gp / sum_credits if sum_credits > 0 else 2.0
+            # Calculate GPA with proper guard against division by zero
+            if sum_credits > 0:
+                avg_gpa = sum_gp / sum_credits
+            else:
+                # No courses taken (shouldn't happen with num_courses >= 2)
+                avg_gpa = DEFAULT_GPA
+
+            # Store the class year BEFORE any advancement for accurate enrollment record
+            enrollment_class_year = s["class_year"]
 
             # 1) Check if they're a senior => maybe graduate
             if s["class_year"] == 4:
-                # chance to graduate
                 if random.random() < senior_grad_prob:
-                    # they graduate
+                    # Student graduates
                     s["active"] = False
                     status = "Completed"
-                    # record a completion
+                    # Calculate completion date (May of the following year)
+                    completion_date = datetime.date(term_year + 1, 5, 15)
                     completion_rows.append((
                         completion_id_counter,
                         s["student_id"],
-                        random.choice(["Bachelor’s","Associate","Certificate <1 year"]),
+                        random.choice(AWARD_TYPES),
                         program,
-                        "2025-05-15"  # placeholder date
+                        completion_date.strftime("%Y-%m-%d")
                     ))
                     completion_id_counter += 1
 
-            # 2) If they're still active => apply retention logic
-            retained_flag = 0
+            # 2) If still active => apply retention logic
+            # retained_next_term: 1 = student will return next term, 0 = student leaves
+            retained_next_term = 0
             if s["active"]:
-                # map GPA -> base prob
-                base_prob = map_gpa_to_retention_prob(avg_gpa)
-                # Race penalty
-                if s["race_eth"] == "Black/African American":
-                    base_prob -= race_penalty_for_retention
-                # clamp 0..1
-                base_prob = max(0.0, min(1.0, base_prob))
+                # Calculate retention probability based on GPA
+                retention_prob = map_gpa_to_retention_prob(avg_gpa)
 
-                # random dropout check
-                if random.random() < base_prob:
-                    # they stay
-                    retained_flag = 1
-                    # also possibly advance class year if not senior
+                # Apply demographic-based retention penalty (models observed disparities)
+                if s["race_eth"] == "Black/African American":
+                    retention_prob -= race_penalty_for_retention
+
+                # Clamp probability to valid range [0, 1]
+                retention_prob = max(0.0, min(1.0, retention_prob))
+
+                # Determine if student is retained for next term
+                if random.random() < retention_prob:
+                    # Student stays - will be retained for next term
+                    retained_next_term = 1
+
+                    # Check for class year advancement (only if not already senior)
                     cy = s["class_year"]
                     if cy == 1 and random.random() < freshman_to_soph_prob:
                         s["class_year"] = 2
@@ -267,19 +337,20 @@ def generate_stable_population_data(
                     elif cy == 3 and random.random() < junior_to_senior_prob:
                         s["class_year"] = 4
                 else:
-                    # dropout
+                    # Student drops out
                     s["active"] = False
                     status = "Withdrawn"
 
-            # Now insert the enrollment row (with the final class_year after possible advancement)
+            # Insert enrollment row with class year AT TIME OF ENROLLMENT
+            # (not the advanced class year for next term)
             enrollment_rows.append((
                 enrollment_id_counter,
                 s["student_id"],
                 term_label,
                 program,
                 status,
-                retained_flag,           # retained_next_term
-                s["class_year"],         # store the final class year for this term
+                retained_next_term,      # 1 if returning next term, 0 if leaving
+                enrollment_class_year,   # class year during THIS enrollment
                 avg_gpa
             ))
             enrollment_id_counter += 1

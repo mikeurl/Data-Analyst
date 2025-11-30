@@ -21,14 +21,61 @@ import os
 import re
 import sqlite3
 import sys
+import logging
+import time
+import hashlib
+import fcntl
+from contextlib import contextmanager
+from functools import lru_cache
+from typing import Optional, Tuple, Dict, Any, List, Union
 
-from openai import OpenAI
-import gradio as gr
+# Core imports with graceful degradation
+try:
+    from openai import OpenAI, APIError, RateLimitError, APIConnectionError
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+    OpenAI = None
+    APIError = Exception
+    RateLimitError = Exception
+    APIConnectionError = Exception
+
+try:
+    import gradio as gr
+    GRADIO_AVAILABLE = True
+except ImportError:
+    GRADIO_AVAILABLE = False
+    gr = None
+
 import pandas as pd
 import numpy as np
+
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend for server
 import matplotlib.pyplot as plt
+
+# Optional statistical libraries - graceful degradation
+STATSMODELS_AVAILABLE = False
+SKLEARN_AVAILABLE = False
+SCIPY_AVAILABLE = False
+
+try:
+    import statsmodels.api as sm
+    STATSMODELS_AVAILABLE = True
+except ImportError:
+    sm = None
+
+try:
+    import sklearn
+    SKLEARN_AVAILABLE = True
+except ImportError:
+    sklearn = None
+
+try:
+    import scipy
+    SCIPY_AVAILABLE = True
+except ImportError:
+    scipy = None
 
 # Import database setup functions for auto-initialization
 from create_ipeds_db_schema import create_ipeds_db_schema
@@ -38,7 +85,24 @@ from SyntheticDataforSchema2 import generate_stable_population_data
 # 1. CONFIGURATION
 ###############################################################################
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 DB_PATH = "ipeds_data.db"  # Path to your SQLite DB file.
+
+# Model configuration - can be overridden via environment variable
+DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
+
+# Rate limiting configuration
+RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "10"))  # requests per window
+RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "60"))  # seconds
+
+# Simple in-memory rate limiter
+_rate_limit_tracker: Dict[str, List[float]] = {}
 
 # Get OpenAI API key from environment variable - will create client when needed
 DEFAULT_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -55,47 +119,202 @@ if not DEFAULT_API_KEY:
     print("="*70 + "\n")
 
 ###############################################################################
+# 1.5 HELPER UTILITIES
+###############################################################################
+
+def check_rate_limit(api_key: str) -> Tuple[bool, Optional[str]]:
+    """
+    Check if the request should be rate limited.
+
+    Args:
+        api_key: The API key being used (used as identifier)
+
+    Returns:
+        Tuple of (is_allowed, error_message). If is_allowed is False,
+        error_message contains the reason.
+    """
+    # Use hash of API key as identifier (don't store actual keys)
+    key_hash = hashlib.sha256(api_key.encode()).hexdigest()[:16]
+    current_time = time.time()
+
+    if key_hash not in _rate_limit_tracker:
+        _rate_limit_tracker[key_hash] = []
+
+    # Clean old entries
+    _rate_limit_tracker[key_hash] = [
+        t for t in _rate_limit_tracker[key_hash]
+        if current_time - t < RATE_LIMIT_WINDOW
+    ]
+
+    if len(_rate_limit_tracker[key_hash]) >= RATE_LIMIT_REQUESTS:
+        wait_time = RATE_LIMIT_WINDOW - (current_time - _rate_limit_tracker[key_hash][0])
+        return False, f"Rate limit exceeded. Please wait {int(wait_time)} seconds before trying again."
+
+    _rate_limit_tracker[key_hash].append(current_time)
+    return True, None
+
+
+@contextmanager
+def get_db_connection(db_path: str = DB_PATH):
+    """
+    Context manager for database connections ensuring proper cleanup.
+
+    Args:
+        db_path: Path to the SQLite database file
+
+    Yields:
+        sqlite3.Connection object
+
+    Example:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM students")
+    """
+    conn = None
+    try:
+        conn = sqlite3.connect(db_path)
+        yield conn
+    except sqlite3.Error as e:
+        logger.error(f"Database error: {e}")
+        raise
+    finally:
+        if conn:
+            conn.close()
+
+
+# Schema cache with TTL
+_schema_cache: Dict[str, Tuple[str, float]] = {}
+SCHEMA_CACHE_TTL = 300  # 5 minutes
+
+
+def get_cached_schema(db_path: str = DB_PATH, force_refresh: bool = False) -> str:
+    """
+    Get schema info with caching to avoid repeated database queries.
+
+    Args:
+        db_path: Path to the database
+        force_refresh: If True, bypass cache and fetch fresh schema
+
+    Returns:
+        Schema information string
+    """
+    current_time = time.time()
+
+    if not force_refresh and db_path in _schema_cache:
+        cached_schema, cache_time = _schema_cache[db_path]
+        if current_time - cache_time < SCHEMA_CACHE_TTL:
+            logger.debug("Using cached schema")
+            return cached_schema
+
+    # Fetch fresh schema
+    schema = get_live_schema_info(db_path)
+    _schema_cache[db_path] = (schema, current_time)
+    logger.debug("Schema cache refreshed")
+    return schema
+
+
+def call_openai_with_retry(
+    client: OpenAI,
+    messages: List[Dict[str, str]],
+    temperature: float = 0.0,
+    max_retries: int = 3,
+    model: Optional[str] = None
+) -> str:
+    """
+    Call OpenAI API with retry logic and error handling.
+
+    Args:
+        client: OpenAI client instance
+        messages: List of message dicts for the API
+        temperature: Sampling temperature
+        max_retries: Maximum number of retry attempts
+        model: Model to use (defaults to DEFAULT_MODEL)
+
+    Returns:
+        The response content string
+
+    Raises:
+        Exception: If all retries fail
+    """
+    model = model or DEFAULT_MODEL
+    last_error = None
+
+    for attempt in range(max_retries):
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=temperature
+            )
+            return response.choices[0].message.content
+        except RateLimitError as e:
+            last_error = e
+            wait_time = 2 ** attempt  # Exponential backoff
+            logger.warning(f"Rate limit hit, waiting {wait_time}s (attempt {attempt + 1}/{max_retries})")
+            time.sleep(wait_time)
+        except APIConnectionError as e:
+            last_error = e
+            wait_time = 2 ** attempt
+            logger.warning(f"Connection error, waiting {wait_time}s (attempt {attempt + 1}/{max_retries})")
+            time.sleep(wait_time)
+        except APIError as e:
+            last_error = e
+            logger.error(f"API error: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(1)
+            else:
+                raise
+
+    raise last_error or Exception("Unknown error during API call")
+
+
+###############################################################################
 # 2. DYNAMIC SCHEMA FETCHING
 ###############################################################################
 
-def get_live_schema_info(db_path=DB_PATH):
+def get_live_schema_info(db_path: str = DB_PATH) -> str:
     """
     Connects to the SQLite database, enumerates all tables, columns, and FK relationships,
     and returns a textual summary that GPT can use to know the current schema.
+
+    Args:
+        db_path: Path to the SQLite database file
+
+    Returns:
+        A formatted string containing the database schema information
     """
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+    with get_db_connection(db_path) as conn:
+        cursor = conn.cursor()
 
-    # Get all user tables (exclude internal sqlite_ tables)
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
-    tables = [row[0] for row in cursor.fetchall()]
+        # Get all user tables (exclude internal sqlite_ tables)
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
+        tables = [row[0] for row in cursor.fetchall()]
 
-    schema_text = ["CURRENT SQLITE SCHEMA:"]
+        schema_text = ["CURRENT SQLITE SCHEMA:"]
 
-    for table in tables:
-        schema_text.append(f"\nTABLE: {table}")
+        for table in tables:
+            schema_text.append(f"\nTABLE: {table}")
 
-        # Columns info
-        cursor.execute(f"PRAGMA table_info({table});")
-        columns = cursor.fetchall()  # (cid, name, type, notnull, dflt_value, pk)
-        schema_text.append("  COLUMNS:")
-        for col in columns:
-            cid, name, ctype, notnull, dflt, pk = col
-            pk_flag = " (PK)" if pk else ""
-            schema_text.append(f"    - {name} {ctype}{pk_flag}")
+            # Columns info
+            cursor.execute(f"PRAGMA table_info({table});")
+            columns = cursor.fetchall()  # (cid, name, type, notnull, dflt_value, pk)
+            schema_text.append("  COLUMNS:")
+            for col in columns:
+                cid, name, ctype, notnull, dflt, pk = col
+                pk_flag = " (PK)" if pk else ""
+                schema_text.append(f"    - {name} {ctype}{pk_flag}")
 
-        # Foreign keys
-        cursor.execute(f"PRAGMA foreign_key_list({table});")
-        fkeys = cursor.fetchall()  # (id, seq, table, from_col, to_col, on_update, on_delete, match)
-        if fkeys:
-            schema_text.append("  FOREIGN KEYS:")
-            for fk in fkeys:
-                _, _, ref_table, from_col, to_col, *_ = fk
-                schema_text.append(f"    - {from_col} -> {ref_table}.{to_col}")
-        else:
-            schema_text.append("  FOREIGN KEYS: None")
+            # Foreign keys
+            cursor.execute(f"PRAGMA foreign_key_list({table});")
+            fkeys = cursor.fetchall()  # (id, seq, table, from_col, to_col, on_update, on_delete, match)
+            if fkeys:
+                schema_text.append("  FOREIGN KEYS:")
+                for fk in fkeys:
+                    _, _, ref_table, from_col, to_col, *_ = fk
+                    schema_text.append(f"    - {from_col} -> {ref_table}.{to_col}")
+            else:
+                schema_text.append("  FOREIGN KEYS: None")
 
-    conn.close()
     return "\n".join(schema_text)
 
 ###############################################################################
@@ -131,21 +350,29 @@ def remove_python_fences(py_text):
     else:
         return py_text.replace("```", "").strip()
 
-def run_sql(sql_query):
+def run_sql(sql_query: str) -> Union[pd.DataFrame, str]:
     """
-    Executes the given SQL query against DB_PATH and returns a pandas DataFrame.
-    If there's an error, returns an error string instead.
+    Execute SQL query against the database and return results.
+
+    Args:
+        sql_query: The SQL query to execute
+
+    Returns:
+        pandas DataFrame with results on success, or error string on failure
     """
     try:
-        conn = sqlite3.connect(DB_PATH)
-        df = pd.read_sql_query(sql_query, conn)
-        conn.close()
-        return df
+        with get_db_connection(DB_PATH) as conn:
+            df = pd.read_sql_query(sql_query, conn)
+            logger.info(f"SQL query executed successfully, returned {len(df)} rows")
+            return df
     except Exception as e:
+        logger.error(f"SQL execution error: {e}")
         return f"SQL Error: {str(e)}"
 
-def run_python_code(py_code, df):
+def run_python_code(py_code: str, df: pd.DataFrame) -> Tuple[str, Optional[str]]:
     """
+    Execute Python code snippet for data analysis in a restricted environment.
+
     Executes the provided Python code snippet in a restricted local environment
     containing 'df' (the DataFrame from the SQL step), 'pd' (pandas), 'np' (numpy),
     'plt' (matplotlib.pyplot), 'tempfile', and 'os' for creating charts.
@@ -158,6 +385,18 @@ def run_python_code(py_code, df):
     - drops rows with missing values
 
     Then we run the model generated code.
+
+    Args:
+        py_code: The Python code to execute
+        df: The DataFrame to analyze
+
+    Returns:
+        Tuple of (result_string, image_path). image_path is None if no
+        visualization was generated.
+
+    Security Note:
+        This function uses exec() which can execute arbitrary code.
+        Only use with trusted inputs in controlled environments.
     """
     import tempfile
     import os
@@ -216,14 +455,20 @@ df = df.dropna()
 # 4. GPT INTERACTION
 ###############################################################################
 
-def check_question_relevance(user_input, client):
+def check_question_relevance(user_input: str, client: OpenAI) -> Tuple[bool, Optional[str]]:
     """
     Checks if the user's question is actually about data that could be in the database.
     Rejects general knowledge questions, calculations, or off-topic queries.
 
-    Returns: (is_relevant: bool, error_message: str or None)
+    Args:
+        user_input: The user's question
+        client: OpenAI client instance
+
+    Returns:
+        Tuple of (is_relevant, error_message). If is_relevant is False,
+        error_message contains the reason for rejection.
     """
-    schema_info = get_live_schema_info(DB_PATH)
+    schema_info = get_cached_schema(DB_PATH)
 
     prompt = f"""
 You are a gatekeeper for a higher education data analysis system.
@@ -270,13 +515,18 @@ NO - if question is clearly unrelated to education data
 Then on a new line, briefly explain your reasoning (1 sentence).
 """
 
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[{"role": "system", "content": prompt}],
-        temperature=0.0
-    )
+    try:
+        decision_text = call_openai_with_retry(
+            client,
+            messages=[{"role": "system", "content": prompt}],
+            temperature=0.0
+        ).strip()
+    except Exception as e:
+        logger.error(f"Error checking question relevance: {e}")
+        # On API error, allow the question through (fail open for relevance check)
+        return True, None
 
-    decision_text = response.choices[0].message.content.strip()
+    decision_text = decision_text.strip()
     lines = decision_text.split('\n', 1)
     decision = lines[0].strip().upper()
     reason = lines[1].strip() if len(lines) > 1 else "No reason provided"
@@ -341,25 +591,38 @@ def check_user_intent(user_input):
 
     return True, None
 
-def validate_sql_safety(sql_code):
+def validate_sql_safety(sql_code: str) -> Tuple[bool, Optional[str]]:
     """
     Validates that SQL contains only safe, read-only operations.
     Allows: SELECT statements and CREATE TEMP/TEMPORARY TABLE
     Blocks: DROP, DELETE, UPDATE, INSERT (into permanent tables), ALTER, etc.
 
-    Returns: (is_safe: bool, error_message: str or None)
-    """
-    # Normalize the SQL: uppercase, remove extra whitespace
-    sql_normalized = ' '.join(sql_code.upper().split())
+    Args:
+        sql_code: The SQL code to validate
 
-    # Remove comments to avoid bypasses like "-- DROP" in comments
+    Returns:
+        Tuple of (is_safe, error_message). If is_safe is False,
+        error_message contains the reason for rejection.
+
+    Security Note:
+        This function removes comments FIRST before any validation to prevent
+        comment-based bypass attempts like "SELECT * -- DROP TABLE".
+    """
+    # STEP 1: Remove comments FIRST (before any other processing)
+    # This prevents bypass attempts using comments to hide malicious code
+
     # Remove single-line comments (-- comment)
     sql_no_comments = '\n'.join([
         line.split('--')[0] for line in sql_code.split('\n')
     ])
     # Remove multi-line comments (/* comment */)
     sql_no_comments = re.sub(r'/\*.*?\*/', '', sql_no_comments, flags=re.DOTALL)
+
+    # STEP 2: Normalize the cleaned SQL: uppercase, remove extra whitespace
     sql_normalized = ' '.join(sql_no_comments.upper().split())
+
+    # Log for debugging (but not the full SQL to avoid log injection)
+    logger.debug(f"Validating SQL (length: {len(sql_normalized)} chars)")
 
     # Dangerous keywords that should never appear (even in temp table contexts)
     dangerous_keywords = [
@@ -371,10 +634,12 @@ def validate_sql_safety(sql_code):
     for keyword in dangerous_keywords:
         # Use word boundaries to avoid false positives (e.g., "DROPPED" column name)
         if re.search(rf'\b{keyword}\b', sql_normalized):
+            logger.warning(f"Blocked SQL with dangerous keyword: {keyword}")
             return False, f"Unsafe SQL operation detected: '{keyword}'. Only SELECT queries and temporary tables are allowed."
 
     # Check for UPDATE - must be very careful
     if re.search(r'\bUPDATE\b', sql_normalized):
+        logger.warning("Blocked SQL with UPDATE statement")
         return False, "Unsafe SQL operation detected: 'UPDATE'. Only SELECT queries and temporary tables are allowed."
 
     # Check for INSERT - only allow into temp tables
@@ -382,6 +647,7 @@ def validate_sql_safety(sql_code):
         # Check if it's inserting into a temp table
         # Pattern: INSERT INTO temp.tablename or INSERT INTO TEMP tablename
         if not re.search(r'\bINSERT\s+INTO\s+(TEMP\.|TEMPORARY\.|TEMP\s|TEMPORARY\s)', sql_normalized):
+            logger.warning("Blocked SQL with INSERT into non-temp table")
             return False, "Unsafe SQL operation detected: 'INSERT'. Only SELECT queries and temporary tables are allowed."
 
     # Must contain SELECT or CREATE TEMP/TEMPORARY TABLE
@@ -389,22 +655,37 @@ def validate_sql_safety(sql_code):
     has_temp_create = re.search(r'\bCREATE\s+(TEMP|TEMPORARY)\s+TABLE\b', sql_normalized)
 
     if not (has_select or has_temp_create):
+        logger.warning("Blocked SQL without SELECT or CREATE TEMP TABLE")
         return False, "SQL must contain a SELECT statement or CREATE TEMPORARY TABLE."
 
     # Additional check: if it contains CREATE, ensure it's TEMP/TEMPORARY
     if re.search(r'\bCREATE\b', sql_normalized):
         if not re.search(r'\bCREATE\s+(TEMP|TEMPORARY)\s+TABLE\b', sql_normalized):
+            logger.warning("Blocked SQL with CREATE non-temp table")
             return False, "Only CREATE TEMPORARY TABLE is allowed, not CREATE TABLE for permanent tables."
 
+    logger.debug("SQL validation passed")
     return True, None
 
-def ask_gpt_for_sql(user_question, client):
+def ask_gpt_for_sql(user_question: str, client: OpenAI) -> str:
     """
-    1) Fetch the live schema from the DB.
+    Generate SQL query from natural language question.
+
+    1) Fetch the live schema from the DB (cached).
     2) Prompt GPT to write a SQL query (SQLite syntax) with no code fences.
     3) Return the raw GPT response (which may still have fences).
+
+    Args:
+        user_question: The user's natural language question
+        client: OpenAI client instance
+
+    Returns:
+        Generated SQL code string
+
+    Raises:
+        Exception: If API call fails after retries
     """
-    schema_info = get_live_schema_info(DB_PATH)
+    schema_info = get_cached_schema(DB_PATH)
 
     prompt = f"""
 You are an AI that writes SQL queries for a SQLite database.
@@ -423,21 +704,33 @@ CRITICAL SECURITY REQUIREMENTS:
 
 Please provide ONLY the SQL code, no triple backticks. End with a semicolon.
 """
-    response = client.chat.completions.create(
-        model="gpt-4o",
+    return call_openai_with_retry(
+        client,
         messages=[{"role": "system", "content": prompt}],
         temperature=0.0
     )
-    return response.choices[0].message.content
 
-def should_run_python_analysis(user_question, sql_code, df_preview, client):
+def should_run_python_analysis(
+    user_question: str,
+    sql_code: str,
+    df_preview: str,
+    client: OpenAI
+) -> Tuple[bool, str]:
     """
     Asks GPT whether Python analysis would add value beyond the SQL results.
 
     Simple queries (counts, lists, basic filters) often don't need Python.
     Complex queries (predictions, correlations, trends, statistical analysis) do.
 
-    Returns: (should_run: bool, reason: str)
+    Args:
+        user_question: The user's original question
+        sql_code: The SQL query that was executed
+        df_preview: Preview of the DataFrame results
+        client: OpenAI client instance
+
+    Returns:
+        Tuple of (should_run, reason). should_run is True if Python analysis
+        would add value.
     """
     prompt = f"""
 You are an AI assistant helping decide if Python analysis is needed for a data query.
@@ -475,13 +768,17 @@ NO - if the SQL results already fully answer the question
 Then on a new line, briefly explain your reasoning (1 sentence).
 """
 
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[{"role": "system", "content": prompt}],
-        temperature=0.0
-    )
+    try:
+        decision_text = call_openai_with_retry(
+            client,
+            messages=[{"role": "system", "content": prompt}],
+            temperature=0.0
+        ).strip()
+    except Exception as e:
+        logger.error(f"Error deciding on Python analysis: {e}")
+        # On error, default to not running Python (simpler path)
+        return False, f"Skipped due to API error: {str(e)}"
 
-    decision_text = response.choices[0].message.content.strip()
     lines = decision_text.split('\n', 1)
     decision = lines[0].strip().upper()
     reason = lines[1].strip() if len(lines) > 1 else "No reason provided"
@@ -489,10 +786,23 @@ Then on a new line, briefly explain your reasoning (1 sentence).
     should_run = decision.startswith('YES')
     return should_run, reason
 
-def ask_gpt_for_python(user_question, df_preview, client):
+def ask_gpt_for_python(user_question: str, df_preview: str, client: OpenAI) -> str:
     """
+    Generate Python analysis code for DataFrame exploration.
+
     Tells GPT: "We have a pandas DataFrame named 'df' from the SQL result.
     Provide Python code for further analysis, no triple backticks."
+
+    Args:
+        user_question: The user's original question
+        df_preview: Preview of the DataFrame to analyze
+        client: OpenAI client instance
+
+    Returns:
+        Generated Python code string
+
+    Raises:
+        Exception: If API call fails after retries
     """
     prompt = f"""
 We have a pandas DataFrame named 'df' from a SQL query result.
@@ -603,17 +913,39 @@ df_analysis = df_analysis.dropna()
 correlation = df_analysis.corr()
 result = correlation.to_string()
 """
-    response = client.chat.completions.create(
-        model="gpt-4o",
+    return call_openai_with_retry(
+        client,
         messages=[{"role": "system", "content": prompt}],
         temperature=0.2
     )
-    return response.choices[0].message.content
 
-def ask_gpt_for_explanation(user_question, sql_code, sql_result_str, py_code, py_result_str, client):
+def ask_gpt_for_explanation(
+    user_question: str,
+    sql_code: str,
+    sql_result_str: str,
+    py_code: Optional[str],
+    py_result_str: str,
+    client: OpenAI
+) -> str:
     """
-    Combine everything into a final explanation for the user.
-    Handles cases where Python analysis was skipped (py_code is None).
+    Generate a natural language explanation of the analysis results.
+
+    Combines SQL results and optional Python analysis into a final explanation
+    for the user. Handles cases where Python analysis was skipped (py_code is None).
+
+    Args:
+        user_question: The user's original question
+        sql_code: The SQL query that was executed
+        sql_result_str: String representation of SQL results
+        py_code: The Python code that was executed (or None if skipped)
+        py_result_str: Output from Python execution
+        client: OpenAI client instance
+
+    Returns:
+        Natural language explanation string
+
+    Raises:
+        Exception: If API call fails after retries
     """
     if py_code is None:
         # Python was skipped - explain SQL results only
@@ -715,23 +1047,32 @@ Example with missing field:
 See visualization below showing the strength of each predictor.
 """
 
-    response = client.chat.completions.create(
-        model="gpt-4o",
+    return call_openai_with_retry(
+        client,
         messages=[{"role": "system", "content": prompt}],
         temperature=0.3
     )
-    return response.choices[0].message.content
 
 ###############################################################################
 # 5. GRADIO INTERFACE
 ###############################################################################
 
-def ai_assistant(user_input, api_key_input):
+def ai_assistant(user_input: str, api_key_input: str) -> Tuple[str, str, str, Any]:
     """
+    Main AI assistant workflow for processing user questions.
+
+    Workflow:
     1) GPT -> SQL code (fenced or unfenced).
     2) Remove fences, run the query.
-    3) GPT -> Python code, remove fences, run the code.
+    3) GPT -> Python code, remove fences, run the code (if needed).
     4) GPT -> final explanation.
+
+    Args:
+        user_input: The user's question
+        api_key_input: OpenAI API key (optional if env var is set)
+
+    Returns:
+        Tuple of (summary_tab, sql_tab, python_tab, image_output) for Gradio
     """
     # Use the API key from input if provided, otherwise use the default one
     active_api_key = api_key_input.strip() if api_key_input and api_key_input.strip() else DEFAULT_API_KEY
@@ -754,8 +1095,20 @@ For more information, see the README.md file.
 """
         return message, "Awaiting a valid API key to generate SQL details.", "Awaiting a valid API key to generate Python details.", gr.update(visible=False, value=None)
 
+    # Check rate limiting
+    is_allowed, rate_limit_error = check_rate_limit(active_api_key)
+    if not is_allowed:
+        logger.warning(f"Rate limit exceeded for API key")
+        return (
+            f"⏳ **Rate Limit Exceeded**\n\n{rate_limit_error}",
+            "Rate limit exceeded - please wait before making another request.",
+            "Rate limit exceeded - please wait before making another request.",
+            gr.update(visible=False, value=None)
+        )
+
     # Create OpenAI client with the API key
     client = OpenAI(api_key=active_api_key)
+    logger.info("Processing new question")
 
     # RELEVANCE: Check if question is about the database data
     question_is_relevant, relevance_error = check_question_relevance(user_input, client)
@@ -923,36 +1276,136 @@ IMPORTANT: The above sample shows only 5 rows, but the FULL dataset contains {to
 
     return summary_tab, sql_tab, python_tab, image_output
 
-def main():
-    """Launch the Gradio web interface for the AI assistant."""
-    # Check if database exists, if not create it automatically
-    if not os.path.exists(DB_PATH):
+def init_database_with_lock() -> bool:
+    """
+    Initialize database with file locking to prevent race conditions.
+
+    Uses a lock file to ensure only one process creates the database
+    in multi-process deployments.
+
+    Returns:
+        True if database is ready, False on error
+    """
+    lock_file_path = f"{DB_PATH}.lock"
+
+    # Check if database already exists (quick check without lock)
+    if os.path.exists(DB_PATH):
+        # Verify it's not empty/corrupt
+        try:
+            with get_db_connection(DB_PATH) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' LIMIT 1;")
+                if cursor.fetchone():
+                    return True
+        except Exception:
+            pass  # Fall through to recreation
+
+    # Acquire lock for database creation
+    try:
+        lock_file = open(lock_file_path, 'w')
+        try:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (IOError, OSError):
+            # Another process is creating the database, wait for it
+            logger.info("Waiting for another process to create database...")
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            # After acquiring lock, check if DB now exists
+            if os.path.exists(DB_PATH):
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                lock_file.close()
+                return True
+
+        # Double-check after acquiring lock
+        if os.path.exists(DB_PATH):
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            lock_file.close()
+            return True
+
+        # Create database
+        logger.info("Creating database schema...")
         print(f"\n{'='*70}")
         print("Database not found. Generating synthetic data...")
         print(f"{'='*70}")
         print("This will take about 30 seconds...\n")
 
         try:
-            # Step 1: Create schema
             print("Step 1/2: Creating database schema...")
             create_ipeds_db_schema(DB_PATH)
 
-            # Step 2: Generate synthetic data
             print("Step 2/2: Generating synthetic student data...")
             generate_stable_population_data()
 
             print(f"\n{'='*70}")
             print("✓ Database created successfully!")
             print(f"{'='*70}\n")
+            logger.info("Database created successfully")
+
         except Exception as e:
+            logger.error(f"Failed to create database: {e}")
             print(f"\n{'='*70}")
             print(f"ERROR: Failed to create database: {str(e)}")
             print(f"{'='*70}\n")
-            sys.exit(1)
+            # Clean up partial database
+            if os.path.exists(DB_PATH):
+                os.remove(DB_PATH)
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            lock_file.close()
+            return False
+
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+        lock_file.close()
+        return True
+
+    except Exception as e:
+        logger.error(f"Error during database initialization: {e}")
+        return False
+
+
+def check_dependencies() -> Tuple[bool, List[str]]:
+    """
+    Check if required dependencies are available.
+
+    Returns:
+        Tuple of (all_required_available, list_of_warnings)
+    """
+    warnings = []
+
+    if not OPENAI_AVAILABLE:
+        return False, ["Critical: OpenAI library not installed. Run: pip install openai"]
+
+    if not GRADIO_AVAILABLE:
+        return False, ["Critical: Gradio library not installed. Run: pip install gradio"]
+
+    # Optional dependencies
+    if not STATSMODELS_AVAILABLE:
+        warnings.append("Warning: statsmodels not installed. Regression analysis will be limited.")
+    if not SKLEARN_AVAILABLE:
+        warnings.append("Warning: scikit-learn not installed. ML analysis will be limited.")
+    if not SCIPY_AVAILABLE:
+        warnings.append("Warning: scipy not installed. Scientific analysis will be limited.")
+
+    return True, warnings
+
+
+def main():
+    """Launch the Gradio web interface for the AI assistant."""
+    # Check dependencies
+    deps_ok, dep_warnings = check_dependencies()
+    if not deps_ok:
+        for warning in dep_warnings:
+            print(f"ERROR: {warning}")
+        sys.exit(1)
+
+    for warning in dep_warnings:
+        print(warning)
+
+    # Initialize database with proper locking
+    if not init_database_with_lock():
+        sys.exit(1)
 
     print(f"\nStarting Higher Education AI Analyst...")
     print(f"Using database: {DB_PATH}")
-    print(f"OpenAI Model: gpt-4o")
+    print(f"OpenAI Model: {DEFAULT_MODEL}")
     print("\nLaunching Gradio interface...")
 
     # Two-column layout with ChatGPT styling
