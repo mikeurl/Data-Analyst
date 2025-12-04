@@ -19,6 +19,9 @@ openai>=1.0.0
 # Web interface for AI assistant
 gradio>=4.0.0
 
+# PDF report generation (optional - falls back to HTML if not available)
+reportlab>=4.0.0
+
 # Optional: For loading environment variables from .env file
 python-dotenv>=1.0.0
 

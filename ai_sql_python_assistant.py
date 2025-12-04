@@ -81,6 +81,20 @@ except ImportError:
 from create_ipeds_db_schema import create_ipeds_db_schema
 from SyntheticDataforSchema2 import generate_stable_population_data
 
+# Import IPEDS modules for Fall Enrollment form completion
+try:
+    from ipeds_query_engine import get_ipeds_engine, IPEDSQueryEngine
+    from ipeds_definitions import get_documentation_lookup, IPEDSDocumentationLookup
+    from ipeds_pdf_report import generate_ipeds_pdf
+    IPEDS_MODULES_AVAILABLE = True
+except ImportError:
+    IPEDS_MODULES_AVAILABLE = False
+    get_ipeds_engine = None
+    IPEDSQueryEngine = None
+    get_documentation_lookup = None
+    IPEDSDocumentationLookup = None
+    generate_ipeds_pdf = None
+
 ###############################################################################
 # 1. CONFIGURATION
 ###############################################################################
@@ -1276,6 +1290,118 @@ IMPORTANT: The above sample shows only 5 rows, but the FULL dataset contains {to
 
     return summary_tab, sql_tab, python_tab, image_output
 
+
+###############################################################################
+# 6. IPEDS FORM COMPLETION FUNCTIONS
+###############################################################################
+
+def get_available_ipeds_terms() -> list:
+    """Get list of available terms for IPEDS reporting."""
+    if not IPEDS_MODULES_AVAILABLE:
+        return []
+    try:
+        engine = get_ipeds_engine(DB_PATH)
+        return engine.get_available_terms()
+    except Exception as e:
+        logger.error(f"Error getting IPEDS terms: {e}")
+        return []
+
+
+def generate_ipeds_report(term: str, component: str) -> Tuple[str, Optional[str]]:
+    """
+    Generate IPEDS report for a specific component.
+
+    Args:
+        term: The term to report (e.g., "Fall 2024")
+        component: The IPEDS component (Part A, Part B, etc.)
+
+    Returns:
+        Tuple of (report_html, file_path_for_download)
+    """
+    if not IPEDS_MODULES_AVAILABLE:
+        return "IPEDS modules not available. Please check installation.", None
+
+    try:
+        engine = get_ipeds_engine(DB_PATH)
+
+        if component == "Part A - Race/Ethnicity/Gender":
+            data = engine.generate_part_a(term)
+            html = engine.format_part_a_html(data)
+        elif component == "Part B - Age":
+            data = engine.generate_part_b(term)
+            html = engine.format_part_b_html(data)
+        elif component == "Part C - Residence":
+            data = engine.generate_part_c(term)
+            html = engine.format_part_c_html(data)
+        elif component == "Part E - Retention Rates":
+            year = int(term.split()[-1]) - 1
+            data = engine.generate_part_e(year)
+            html = engine.format_part_e_html(data)
+        elif component == "Part F - Student-Faculty Ratio":
+            data = engine.generate_part_f(term)
+            html = engine.format_part_f_html(data)
+        elif component == "Full Report (All Parts)":
+            report = engine.generate_full_report(term)
+            html = f"<h2>IPEDS Fall Enrollment Report - {term}</h2>"
+            html += engine.format_part_a_html(report['part_a'])
+            html += engine.format_part_b_html(report['part_b'])
+            html += engine.format_part_c_html(report['part_c'])
+            html += engine.format_part_e_html(report['part_e'])
+            html += engine.format_part_f_html(report['part_f'])
+        else:
+            return f"Unknown component: {component}", None
+
+        return html, None
+
+    except Exception as e:
+        logger.error(f"Error generating IPEDS report: {e}")
+        return f"Error generating report: {str(e)}", None
+
+
+def generate_ipeds_pdf_report(term: str) -> Tuple[str, Optional[str]]:
+    """
+    Generate a downloadable PDF report for all IPEDS components.
+
+    Args:
+        term: The term to report
+
+    Returns:
+        Tuple of (status_message, file_path)
+    """
+    if not IPEDS_MODULES_AVAILABLE:
+        return "IPEDS modules not available.", None
+
+    try:
+        engine = get_ipeds_engine(DB_PATH)
+        report = engine.generate_full_report(term)
+        pdf_path = generate_ipeds_pdf(report)
+        return f"PDF report generated successfully for {term}.", pdf_path
+    except Exception as e:
+        logger.error(f"Error generating PDF: {e}")
+        return f"Error generating PDF: {str(e)}", None
+
+
+def lookup_ipeds_definition(query: str) -> str:
+    """
+    Look up IPEDS definitions based on user query.
+
+    Args:
+        query: The user's question about IPEDS definitions
+
+    Returns:
+        Formatted definition response
+    """
+    if not IPEDS_MODULES_AVAILABLE:
+        return "IPEDS documentation module not available."
+
+    try:
+        lookup = get_documentation_lookup()
+        return lookup.answer_question(query)
+    except Exception as e:
+        logger.error(f"Error looking up IPEDS definition: {e}")
+        return f"Error: {str(e)}"
+
+
 def init_database_with_lock() -> bool:
     """
     Initialize database with file locking to prevent race conditions.
@@ -1775,20 +1901,24 @@ def main():
         body_background_fill_dark="*neutral_950",
     )
 
-    # Build two-column interface
+    # Build tabbed interface with AI Query and IPEDS Form Completion
     with gr.Blocks(theme=theme, css=custom_css, title="Higher Education AI Analyst") as demo:
 
-        with gr.Row(elem_classes=["two-column-container"]):
-            # LEFT COLUMN - Input side
-            with gr.Column(elem_classes=["left-column"], scale=1):
-                # Header
-                gr.HTML("""
-                    <div class="header-section">
-                        <img src="https://raw.githubusercontent.com/mikeurl/Data-Analyst/claude/review-repo-structure-011CUqm6vjgy43VX5NmComtm/docs/logo.png"
-                             alt="Higher Education AI Analyst">
-                        <h1>Higher Education AI Analyst</h1>
-                    </div>
-                """)
+        # Main tabs for switching between modes
+        with gr.Tabs() as main_tabs:
+            # TAB 1: Natural Language Query (Original Functionality)
+            with gr.TabItem("AI Data Query"):
+                with gr.Row(elem_classes=["two-column-container"]):
+                    # LEFT COLUMN - Input side
+                    with gr.Column(elem_classes=["left-column"], scale=1):
+                        # Header
+                        gr.HTML("""
+                            <div class="header-section">
+                                <img src="https://raw.githubusercontent.com/mikeurl/Data-Analyst/claude/review-repo-structure-011CUqm6vjgy43VX5NmComtm/docs/logo.png"
+                                     alt="Higher Education AI Analyst">
+                                <h1>Higher Education AI Analyst</h1>
+                            </div>
+                        """)
 
                 # Question input
                 question_input = gr.Textbox(
@@ -1907,15 +2037,109 @@ Do not deploy with real student data without implementing:
                             elem_id="python-pane"
                         )
 
-                # Visualization output (when Python generates charts)
-                image_output = gr.Image(
-                    label="Visualization",
-                    visible=False,  # Hidden until visualization is generated
-                    show_label=True,
-                    type="filepath"
-                )
+                    # Visualization output (when Python generates charts)
+                    image_output = gr.Image(
+                        label="Visualization",
+                        visible=False,  # Hidden until visualization is generated
+                        show_label=True,
+                        type="filepath"
+                    )
 
-        # Connect the submit button
+            # TAB 2: IPEDS Form Completion
+            with gr.TabItem("IPEDS Form Completion"):
+                gr.HTML("""
+                    <div class="header-section">
+                        <h1>IPEDS Fall Enrollment Form Completion</h1>
+                        <p>Generate IPEDS-formatted reports for Parts A, B, C, E, and F</p>
+                    </div>
+                """)
+
+                with gr.Row():
+                    # Left panel - Controls
+                    with gr.Column(scale=1):
+                        # Get available terms
+                        available_terms = get_available_ipeds_terms()
+                        default_term = available_terms[0] if available_terms else "Fall 2026"
+
+                        ipeds_term_dropdown = gr.Dropdown(
+                            choices=available_terms if available_terms else ["No data available"],
+                            value=default_term,
+                            label="Select Term",
+                            info="Choose the Fall term for IPEDS reporting"
+                        )
+
+                        ipeds_component_dropdown = gr.Dropdown(
+                            choices=[
+                                "Part A - Race/Ethnicity/Gender",
+                                "Part B - Age",
+                                "Part C - Residence",
+                                "Part E - Retention Rates",
+                                "Part F - Student-Faculty Ratio",
+                                "Full Report (All Parts)"
+                            ],
+                            value="Full Report (All Parts)",
+                            label="Select IPEDS Component",
+                            info="Choose which part of Fall Enrollment to generate"
+                        )
+
+                        generate_report_btn = gr.Button("Generate Report", variant="primary")
+
+                        gr.HTML('<div class="examples-label">Quick Actions</div>')
+
+                        with gr.Row():
+                            btn_part_a = gr.Button("Part A Report", size="sm")
+                            btn_retention = gr.Button("Retention Rates", size="sm")
+
+                        with gr.Row():
+                            btn_full = gr.Button("Full Report", size="sm")
+                            btn_pdf = gr.Button("Download PDF", size="sm")
+
+                        gr.HTML("<hr style='margin: 20px 0; border-color: rgba(148,163,184,0.2);'>")
+
+                        # IPEDS Documentation Lookup
+                        gr.HTML('<div class="examples-label">IPEDS Definitions Lookup</div>')
+
+                        definition_query = gr.Textbox(
+                            lines=2,
+                            label="Ask about IPEDS definitions",
+                            placeholder="e.g., What is a first-time student?",
+                            elem_id="definition-query"
+                        )
+
+                        lookup_btn = gr.Button("Look Up Definition", variant="secondary")
+
+                        with gr.Row():
+                            btn_def_firsttime = gr.Button("First-time Student", size="sm")
+                            btn_def_retention = gr.Button("Retention Rate", size="sm")
+
+                        with gr.Row():
+                            btn_def_fulltime = gr.Button("Full-time Definition", size="sm")
+                            btn_def_race = gr.Button("Race/Ethnicity", size="sm")
+
+                    # Right panel - Output
+                    with gr.Column(scale=2):
+                        with gr.Tabs():
+                            with gr.TabItem("Report Output"):
+                                ipeds_report_output = gr.HTML(
+                                    "<p>Select a term and component, then click 'Generate Report' to view IPEDS data.</p>",
+                                    elem_classes=["results-pane"]
+                                )
+
+                            with gr.TabItem("Definition Lookup"):
+                                definition_output = gr.Markdown(
+                                    "Ask a question about IPEDS definitions to see the answer here.",
+                                    elem_classes=["results-pane"]
+                                )
+
+                        # PDF download component
+                        pdf_download = gr.File(
+                            label="Download PDF Report",
+                            visible=False
+                        )
+
+                        pdf_status = gr.Markdown("")
+
+        # Connect the submit button for AI Query tab
         submit_btn.click(
             fn=ai_assistant,
             inputs=[question_input, api_key_input],
@@ -1949,6 +2173,79 @@ Do not deploy with real student data without implementing:
             fn=lambda: gr.update(value="What is the retention trend for students?"),
             inputs=None,
             outputs=question_input
+        )
+
+        # Connect IPEDS Form Completion tab buttons
+        def handle_ipeds_report(term, component):
+            html, _ = generate_ipeds_report(term, component)
+            return html
+
+        generate_report_btn.click(
+            fn=handle_ipeds_report,
+            inputs=[ipeds_term_dropdown, ipeds_component_dropdown],
+            outputs=ipeds_report_output
+        )
+
+        # Quick action buttons for IPEDS
+        btn_part_a.click(
+            fn=lambda t: generate_ipeds_report(t, "Part A - Race/Ethnicity/Gender")[0],
+            inputs=[ipeds_term_dropdown],
+            outputs=ipeds_report_output
+        )
+
+        btn_retention.click(
+            fn=lambda t: generate_ipeds_report(t, "Part E - Retention Rates")[0],
+            inputs=[ipeds_term_dropdown],
+            outputs=ipeds_report_output
+        )
+
+        btn_full.click(
+            fn=lambda t: generate_ipeds_report(t, "Full Report (All Parts)")[0],
+            inputs=[ipeds_term_dropdown],
+            outputs=ipeds_report_output
+        )
+
+        def handle_pdf_generation(term):
+            status, file_path = generate_ipeds_pdf_report(term)
+            if file_path:
+                return status, gr.update(visible=True, value=file_path)
+            return status, gr.update(visible=False, value=None)
+
+        btn_pdf.click(
+            fn=handle_pdf_generation,
+            inputs=[ipeds_term_dropdown],
+            outputs=[pdf_status, pdf_download]
+        )
+
+        # Definition lookup buttons
+        lookup_btn.click(
+            fn=lookup_ipeds_definition,
+            inputs=[definition_query],
+            outputs=definition_output
+        )
+
+        btn_def_firsttime.click(
+            fn=lambda: lookup_ipeds_definition("What is a first-time student?"),
+            inputs=None,
+            outputs=definition_output
+        )
+
+        btn_def_retention.click(
+            fn=lambda: lookup_ipeds_definition("How is retention rate calculated?"),
+            inputs=None,
+            outputs=definition_output
+        )
+
+        btn_def_fulltime.click(
+            fn=lambda: lookup_ipeds_definition("What is full-time student status?"),
+            inputs=None,
+            outputs=definition_output
+        )
+
+        btn_def_race.click(
+            fn=lambda: lookup_ipeds_definition("What are the race/ethnicity categories?"),
+            inputs=None,
+            outputs=definition_output
         )
 
     demo.launch(share=False, server_port=7860)
